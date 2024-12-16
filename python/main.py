@@ -2,7 +2,8 @@
 from sort_files import sort_files
 from extract_tables import extract_tables_and_save
 
-# Directory containing the PDF files
+
+# # Directory containing the PDF files
 directory_path = 'D:/midas-vergi/ekstreler/'
 
 # Call the sorting script
@@ -13,5 +14,3 @@ sort_files(directory_path)
 output_path = 'yatirim_islemleri_extracted.xlsx'
 print("Starting table extraction...")
 extract_tables_and_save(directory_path, output_path)
-
-
