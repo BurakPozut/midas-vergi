@@ -2,6 +2,8 @@
 from sort_files import sort_files
 from extract_tables import extract_tables_and_save
 from inflation_calculator import get_inflation,calculate_inflation
+from get_dolar import get_dolar
+
 
 
 # # Directory containing the PDF files
@@ -17,5 +19,8 @@ from inflation_calculator import get_inflation,calculate_inflation
 # extract_tables_and_save(directory_path, output_path)
 
 # # Call the inflation calculator
-inflation_value = calculate_inflation()
-print(f"in main: {inflation_value}")
+# inflation_value = calculate_inflation(2024, "ŞUBAT", 2024, "MART")
+# dolar = get_dolar("04.01.2023")
+# print(f"in main: {dolar}")
+
+
