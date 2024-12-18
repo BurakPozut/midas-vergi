@@ -1,37 +1,36 @@
-from pymongo import MongoClient
+from db_connection import db
 
+months = [
+    "OCAK", "ŞUBAT", "MART", "NİSAN", "MAYIS", "HAZİRAN",
+    "TEMMUZ", "AĞUSTOS", "EYLÜL", "EKİM", "KASIM", "ARALIK"
+]
+
+# Function to get previous month and year
+def get_previous_month(year, month):
+    if month == 0: # Handle case for January
+        return year - 1, "ARALIK"
+    else:
+        return year, months[month]
+
+# Function to get inflation for a specific year and month
 def get_inflation(year, month):
-    # Connect to MongoDB
-  mongo_uri = "mongodb+srv://burakpozut88:Dx4HNRwrvf8GBfhK@cluster0.h0fnumk.mongodb.net/"
-  client = MongoClient(mongo_uri)
-
-  # Access the database and collection
-  db = client["ExchangeRate"]  # Replace with your database name
-  collection = db["YiUfe"]  # Replace with your collection name
-
-  # Find the document with the given year
-  query = {"YIL": year}
-  result = collection.find_one(query)
-
-  # Extract the value for the specified month
-  if result:
-      month_value = result.get(month)  # Use .get() to safely access the month field
-      if month_value is not None:
-          return month_value
-        #   print(f"The value for {month} in {year} is: {month_value}")
-      else:
-          print(f"The month '{month}' does not exist in the document.")
-  else:
-      print(f"No document found for the year {year}.")
+    collection = db["YiUfe"]
+    query = {"YIL": year}
+    result = collection.find_one(query)
+    if result:
+        return result.get(month)
+    print(f"No inflation data found for {month} {year}")
+    return None
 
 
-def calculate_inflation():
-    # Get the inflation values for March 2021 and March 2022
-    inflation_2021 = get_inflation(2024, "ŞUBAT")
-    inflation_2022 = get_inflation(2024, "MART")
+def calculate_inflation(first_year, first_month, second_year, second_month):
+    print(f"Calculating inflation between {months[first_month]} {first_year} and {months[second_month]} {second_year}...")
+    inflation_start = get_inflation(first_year, months[first_month])
+    inflation_end = get_inflation(second_year, months[second_month])
     
-    # Calculate the inflation rate
-    inflation_rate = (inflation_2022 - inflation_2021) / inflation_2021 * 100
-    
-    # Print the inflation rate
-    print(f"The inflation rate between March 2021 and March 2022 is: {inflation_rate:.2f}%")
+    if inflation_start and inflation_end:
+        inflation_rate = (inflation_end - inflation_start) / inflation_start * 100
+        print(f"Inflation rate between {months[first_month]} {first_year} and {months[second_month]} {second_year}: {inflation_rate:.2f}%")
+        return inflation_rate
+    print("Inflation calculation failed.")
+    return None
