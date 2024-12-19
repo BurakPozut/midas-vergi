@@ -1,4 +1,5 @@
 # main.py
+from tax_calculator import tax_calculator
 from sort_files import sort_files
 from extract_tables import extract_tables_and_save
 from inflation_calculator import get_inflation,calculate_inflation
@@ -23,4 +24,5 @@ from get_dolar import get_dolar
 # dolar = get_dolar("04.01.2023")
 # print(f"in main: {dolar}")
 
+tax_calculator()
 
