@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { deleteFile } from '@/app/actions/delete-file';
+import { useSession } from "next-auth/react"
 
 interface UploadProgress {
   [key: string]: {
@@ -44,8 +45,17 @@ const getFileIcon = (fileName: string) => {
 };
 
 export default function FileUploader() {
+  const { data: session, status } = useSession()
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
   const [isDragging, setIsDragging] = useState(false);
+
+  if (status === "loading") {
+    return <div>Loading...</div>
+  }
+
+  if (!session) {
+    return <div>Please sign in to upload files</div>
+  }
 
   const handleFileUpload = async (files: FileList | null) => {
     if (files && files.length > 0) {
@@ -199,8 +209,8 @@ export default function FileUploader() {
               </div>
               <div className="flex items-center gap-3">
                 <span className={`text-sm font-medium ${status === 'error' ? 'text-red-400' :
-                    status === 'completed' ? 'text-green-400' :
-                      'text-blue-400'
+                  status === 'completed' ? 'text-green-400' :
+                    'text-blue-400'
                   }`}>
                   {status === 'error' ? 'Hata' :
                     status === 'completed' ? 'Tamamlandı' :

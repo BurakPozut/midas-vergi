@@ -3,7 +3,7 @@ import FileUploader from './components/FileUploader';
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-navy-900">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-28">
         {/* Hero Section */}
         <div className="text-center space-y-8 mb-16">
           <h1 className="animate-fade-in text-5xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
