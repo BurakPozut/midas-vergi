@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { deleteFile } from '@/app/actions/delete-file';
 import { useSession } from "next-auth/react"
+
+type UploadStatus = 'uploading' | 'completed' | 'error' | 'selected';
 
 interface UploadProgress {
   [key: string]: {
     progress: number;
-    status: 'uploading' | 'completed' | 'error';
+    status: UploadStatus;
   };
 }
 
@@ -48,6 +49,8 @@ export default function FileUploader() {
   const { data: session, status } = useSession()
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [showUploadButton, setShowUploadButton] = useState(false);
 
   if (status === "loading") {
     return <div>Loading...</div>
@@ -57,26 +60,56 @@ export default function FileUploader() {
     return <div>Please sign in to upload files</div>
   }
 
-  const handleFileUpload = async (files: FileList | null) => {
+  const handleFileSelection = (files: FileList | null) => {
     if (files && files.length > 0) {
-      const formData = new FormData();
+      const newFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+      setSelectedFiles(prev => [...prev, ...newFiles]);
 
-      Array.from(files).forEach((file) => {
-        formData.append('files', file);
+      newFiles.forEach(file => {
         setUploadProgress(prev => ({
           ...prev,
           [file.name]: {
             progress: 0,
-            status: 'uploading'
+            status: 'selected' as UploadStatus
           }
         }));
       });
 
-      const xhr = new XMLHttpRequest();
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const progress = (event.loaded / event.total) * 100;
-          Array.from(files).forEach((file) => {
+      setShowUploadButton(true);
+    }
+  };
+
+  const removeSelectedFile = (fileName: string) => {
+    setSelectedFiles(prev => prev.filter(f => f.name !== fileName));
+    setUploadProgress(prev => {
+      const newState = { ...prev };
+      delete newState[fileName];
+      return newState;
+    });
+    if (selectedFiles.length <= 1) {
+      setShowUploadButton(false);
+    }
+  };
+
+  const uploadFiles = async () => {
+    for (const file of selectedFiles) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      setUploadProgress(prev => ({
+        ...prev,
+        [file.name]: {
+          progress: 0,
+          status: 'uploading'
+        }
+      }));
+
+      try {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const progress = (event.loaded / event.total) * 100;
             setUploadProgress(prev => ({
               ...prev,
               [file.name]: {
@@ -84,13 +117,11 @@ export default function FileUploader() {
                 status: 'uploading'
               }
             }));
-          });
-        }
-      };
+          }
+        };
 
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          Array.from(files).forEach((file) => {
+        xhr.onload = () => {
+          if (xhr.status === 200) {
             setUploadProgress(prev => ({
               ...prev,
               [file.name]: {
@@ -98,9 +129,7 @@ export default function FileUploader() {
                 status: 'completed'
               }
             }));
-          });
-        } else {
-          Array.from(files).forEach((file) => {
+          } else {
             setUploadProgress(prev => ({
               ...prev,
               [file.name]: {
@@ -108,12 +137,10 @@ export default function FileUploader() {
                 status: 'error'
               }
             }));
-          });
-        }
-      };
+          }
+        };
 
-      xhr.onerror = () => {
-        Array.from(files).forEach((file) => {
+        xhr.onerror = () => {
           setUploadProgress(prev => ({
             ...prev,
             [file.name]: {
@@ -121,36 +148,35 @@ export default function FileUploader() {
               status: 'error'
             }
           }));
-        });
-      };
+        };
 
-      xhr.open('POST', '/api/upload');
-      xhr.send(formData);
+        xhr.open('POST', '/api/upload');
+        xhr.send(formData);
+        await new Promise((resolve) => xhr.onloadend = resolve);
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        setUploadProgress(prev => ({
+          ...prev,
+          [file.name]: {
+            progress: 0,
+            status: 'error'
+          }
+        }));
+      }
     }
-  };
-
-  const removeFile = async (fileName: string) => {
-    const result = await deleteFile(fileName);
-    if (result.success) {
-      setUploadProgress(prev => {
-        const newState = { ...prev };
-        delete newState[fileName];
-        return newState;
-      });
-    } else {
-      console.error('Dosya silinirken hata oluştu');
-    }
+    setSelectedFiles([]);
+    setShowUploadButton(false);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    handleFileUpload(e.dataTransfer.files);
+    handleFileSelection(e.dataTransfer.files);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleFileUpload(e.target.files);
+    handleFileSelection(e.target.files);
   };
 
   return (
@@ -192,9 +218,19 @@ export default function FileUploader() {
             className="hidden"
             onChange={handleInputChange}
             multiple
+            accept=".pdf"
           />
         </label>
       </div>
+
+      {showUploadButton && (
+        <button
+          onClick={uploadFiles}
+          className="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mb-4"
+        >
+          Dosyaları Yükle
+        </button>
+      )}
 
       <div className="space-y-4">
         {Object.entries(uploadProgress).map(([fileName, { progress, status }]) => (
@@ -210,17 +246,19 @@ export default function FileUploader() {
               <div className="flex items-center gap-3">
                 <span className={`text-sm font-medium ${status === 'error' ? 'text-red-400' :
                   status === 'completed' ? 'text-green-400' :
-                    'text-blue-400'
+                    status === 'uploading' ? 'text-blue-400' :
+                      'text-gray-400'
                   }`}>
                   {status === 'error' ? 'Hata' :
                     status === 'completed' ? 'Tamamlandı' :
-                      `${Math.round(progress)}%`}
+                      status === 'uploading' ? `${Math.round(progress)}%` :
+                        'Seçildi'}
                 </span>
-                {status === 'completed' && (
+                {(status === 'completed' || status === 'selected') && (
                   <button
-                    onClick={() => removeFile(fileName)}
+                    onClick={() => removeSelectedFile(fileName)}
                     className="text-gray-400 hover:text-red-400 transition-colors"
-                    title="Dosyayı Sil"
+                    title="Dosyayı Kaldır"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -229,18 +267,20 @@ export default function FileUploader() {
                 )}
               </div>
             </div>
-            <div className="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
-              <div
-                className="h-2 rounded-full transition-all duration-300 ease-out"
-                style={{
-                  width: `${progress}%`,
-                  background: status === 'error' ? 'rgb(239, 68, 68)' :
-                    status === 'completed' ? 'rgb(34, 197, 94)' :
-                      'linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%)',
-                  boxShadow: progress > 0 ? '0 0 10px rgba(59, 130, 246, 0.7)' : 'none'
-                }}
-              />
-            </div>
+            {status !== 'selected' && (
+              <div className="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-2 rounded-full transition-all duration-300 ease-out"
+                  style={{
+                    width: `${progress}%`,
+                    background: status === 'error' ? 'rgb(239, 68, 68)' :
+                      status === 'completed' ? 'rgb(34, 197, 94)' :
+                        'linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%)',
+                    boxShadow: progress > 0 ? '0 0 10px rgba(59, 130, 246, 0.7)' : 'none'
+                  }}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>

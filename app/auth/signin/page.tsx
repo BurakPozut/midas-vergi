@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react"
 import Image from "next/image"
 import { useState } from "react"
-import { Register } from "@/app/components/Register"
+import { Register } from "@/components/Register"
 
 export default function SignIn() {
   const [isRegistering, setIsRegistering] = useState(false)
@@ -27,6 +27,7 @@ export default function SignIn() {
       if (result?.error) {
         setError('Email veya şifre hatalı')
       }
+      window.location.href = '/';
     } catch (err) {
       setError('Bir hata oluştu')
       console.error(err)

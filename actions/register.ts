@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/prisma";
 import { RegisterSchema } from "@/schemas";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -28,9 +28,9 @@ export async function register(formData: RegisterInput) {
     }
 
     const { email, password, name } = result.data;
-
+    console.log("result.data: ", await db.user.findMany());
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await db.user.findFirst({
       where: { email },
     });
 
@@ -42,7 +42,7 @@ export async function register(formData: RegisterInput) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = await prisma.user.create({
+    const user = await db.user.create({
       data: {
         email,
         password: hashedPassword,
