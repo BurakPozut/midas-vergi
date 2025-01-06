@@ -48,12 +48,22 @@ export async function POST(req: Request) {
     await writeFile(filePath, buffer);
     console.log("\n ---File written successfully");
 
-    // Call Python script to extract tables
-    const pythonProcess = spawn("python", [
-      "python/extract_tables.py",
-      filePath,
-      session.user.id,
-    ]);
+    // Call Python script to extract tables with UTF-8 encoding
+    const pythonProcess = spawn(
+      "python",
+      ["python/extract_tables.py", filePath, session.user.id],
+      {
+        env: {
+          ...process.env,
+          PYTHONIOENCODING: "utf-8",
+          PYTHONLEGACYWINDOWSSTDIO: "1", // Add this for Windows
+        },
+      }
+    );
+
+    // Handle Python script output with UTF-8 encoding
+    pythonProcess.stdout.setEncoding("utf-8");
+    pythonProcess.stderr.setEncoding("utf-8");
 
     // Handle Python script output
     pythonProcess.stdout.on("data", (data) => {

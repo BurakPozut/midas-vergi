@@ -2,7 +2,15 @@ import pdfplumber
 import pandas as pd
 import os
 import sys
+import locale
 from db_connection import insert_transactions
+
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+# Force UTF-8 encoding
+if sys.platform.startswith('win'):
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 def extract_tables_and_save(pdf_path, user_id, target_title_prefix="YATIRIM İŞLEMLERİ"):
     try:
