@@ -1,41 +1,57 @@
 import pdfplumber
 import pandas as pd
 import os
+import sys
+from db_connection import insert_transactions
 
-def extract_tables_and_save(directory_path, output_path, target_title_prefix="YATIRIM İŞLEMLERİ"):
-    # Initialize a list to store all rows from all files
-    all_rows = []
-    # Loop through each PDF file in the directory
-    for filename in os.listdir(directory_path):
-        if filename.endswith('.pdf'):
-            file_path = os.path.join(directory_path, filename)
-            print(f"Processing file: {filename}")
-            
-            # Extract data from PDF
-            with pdfplumber.open(file_path) as pdf:
-                full_text = ''
-                for page in pdf.pages:
-                    tables = page.extract_tables()
-                    for table in tables:
-                        if table and table[0][0] and target_title_prefix in table[0][0]:
-                            print(f"Found matching table: {table[0][0]} in {filename}")
-                            for row in table[2:]:
-                                print(row)
-                                if len(row) >= 12:  # Ensure there are enough columns
-                                    all_rows.append(row + [filename])  # Add filename for tracking
+def extract_tables_and_save(pdf_path, user_id, target_title_prefix="YATIRIM İŞLEMLERİ"):
+    try:
+        # Initialize a list to store all rows
+        all_rows = []
+        
+        # Extract data from PDF
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for table in tables:
+                    if table and table[0][0] and target_title_prefix in table[0][0]:
+                        print(f"Found matching table in {pdf_path}")
+                        for row in table[2:]:  # Skip header rows
+                            if len(row) >= 12:  # Ensure there are enough columns
+                                all_rows.append(row)
 
-    # Define column names
-    columns = [
-        "Tarih", "İşlem Türü", "Sembol", "İşlem Tipi", "İşlem Durumu", "Para Birimi",
-        "Emir Adedi", "Emir Tutarı", "Gerçekleşen Adet", "Ortalama İşlem Fiyatı",
-        "İşlem Ücreti", "İşlem Tutarı", "Source File"
-    ]
+        # Define column names
+        columns = [
+            "Tarih", "İşlem Türü", "Sembol", "İşlem Tipi", "İşlem Durumu", "Para Birimi",
+            "Emir Adedi", "Emir Tutarı", "Gerçekleşen Adet", "Ortalama İşlem Fiyatı",
+            "İşlem Ücreti", "İşlem Tutarı"
+        ]
 
-    # Create a DataFrame from the collected rows
-    df = pd.DataFrame(all_rows, columns=columns)
+        # Create DataFrame
+        df = pd.DataFrame(all_rows, columns=columns)
+        
+        # Insert into MongoDB
+        if not df.empty:
+            insert_transactions(df, user_id, pdf_path)
+            print(f"Data extracted and saved successfully from {pdf_path}")
+            return {"success": True, "message": f"Data extracted and saved successfully from {pdf_path}"}
+        else:
+            print("No matching tables found in the PDF")
+            return {"success": False, "error": "No matching tables found in the PDF"}
 
-    # Save all data to an Excel file
-    output_path = 'yatirim_islemleri_extracted.xlsx'
+    except Exception as e:
+        error_msg = f"Error processing PDF: {str(e)}"
+        print(error_msg)
+        return {"success": False, "error": error_msg}
 
-    df.to_excel(output_path, index=False, engine='openpyxl')
-    print(f"Data from all matching tables has been saved to {output_path}")                        
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python extract_tables.py <pdf_path> <user_id>")
+        sys.exit(1)
+        
+    pdf_path = sys.argv[1]
+    user_id = sys.argv[2]
+    
+    result = extract_tables_and_save(pdf_path, user_id)
+    if not result["success"]:
+        sys.exit(1)                        

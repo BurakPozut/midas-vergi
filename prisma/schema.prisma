@@ -8,10 +8,32 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  email        String        @unique
+  password     String
+  name         String?
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Transaction {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  date              DateTime
+  transactionType   String // İşlem Türü
+  symbol            String // Sembol
+  operationType     String // İşlem Tipi
+  status            String // İşlem Durumu
+  currency          String // Para Birimi
+  orderQuantity     Float // Emir Adedi
+  orderAmount       Float // Emir Tutarı
+  executedQuantity  Float // Gerçekleşen Adet
+  averagePrice      Float // Ortalama İşlem Fiyatı
+  transactionFee    Float // İşlem Ücreti
+  transactionAmount Float // İşlem Tutarı
+  sourceFile        String // Source File
+  userId            String   @db.ObjectId
+  user              User     @relation(fields: [userId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

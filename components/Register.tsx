@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from "react"
-import { register } from "@/app/actions/auth"
 import { signIn } from "next-auth/react"
 import { RegisterSchema } from "@/schemas"
+import { register } from "@/actions/register"
 
 interface RegisterProps {
   onError: (error: string) => void
@@ -20,6 +20,7 @@ export function Register({ onError, setLoading, loading }: RegisterProps) {
     e.preventDefault()
     onError('')
     setLoading(true)
+    // console.log("e: ", e)
 
     try {
       const formData = {
@@ -27,6 +28,8 @@ export function Register({ onError, setLoading, loading }: RegisterProps) {
         password,
         name: name.trim()
       }
+
+      console.log("formData: ", formData)
 
       // Validate the data
       const validationResult = RegisterSchema.safeParse(formData)
