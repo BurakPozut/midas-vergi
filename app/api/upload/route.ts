@@ -1,87 +1,153 @@
-import { writeFile } from "fs/promises";
+import { writeFile, unlink } from "fs/promises";
 import { NextResponse } from "next/server";
 import { join } from "path";
 import { auth } from "@/auth";
 import { spawn } from "child_process";
+import type { ChildProcessWithoutNullStreams } from "child_process";
 import fs from "fs/promises";
+
+interface PythonResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  hasData?: boolean;
+}
 
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.id) {
+    const userId = session?.user?.id;
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const data = await req.formData();
-    console.log("FormData received:", data);
+    const files = data.getAll("files") as File[];
 
-    const file: File | null = data.get("file") as unknown as File;
-    console.log("File object:", file?.name, file?.type);
-
-    if (!file) {
+    if (!files || files.length === 0) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
-    // Validate file type
-    if (file.type !== "application/pdf") {
+    // Create user-specific directory: uploads/[userId]
+    const userUploadDir = join(process.cwd(), "uploads", userId);
+    try {
+      await fs.mkdir(userUploadDir, { recursive: true });
+    } catch (err) {
+      console.error("Error creating user upload directory:", err);
       return NextResponse.json(
-        { error: "Only PDF files are allowed" },
-        { status: 400 }
+        { error: "Failed to create upload directory" },
+        { status: 500 }
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const results = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const isLastFile = i === files.length - 1;
 
-    // Create uploads directory if it doesn't exist
-    const uploadDir = join(process.cwd(), "public", "uploads");
-    try {
-      await fs.mkdir(uploadDir, { recursive: true });
-    } catch (err) {
-      console.error("Error creating uploads directory:", err);
-    }
-
-    // Create path and write file
-    const filePath = join("public", "uploads", file.name);
-    console.log("Writing file to:", filePath);
-
-    await writeFile(filePath, buffer);
-    console.log("\n ---File written successfully");
-
-    // Call Python script to extract tables with UTF-8 encoding
-    const pythonProcess = spawn(
-      "python",
-      ["python/extract_tables.py", filePath, session.user.id],
-      {
-        env: {
-          ...process.env,
-          PYTHONIOENCODING: "utf-8",
-          PYTHONLEGACYWINDOWSSTDIO: "1", // Add this for Windows
-        },
+      // Validate file type
+      if (file.type !== "application/pdf") {
+        return NextResponse.json(
+          { error: `File ${file.name} is not a PDF` },
+          { status: 400 }
+        );
       }
-    );
 
-    // Handle Python script output with UTF-8 encoding
-    pythonProcess.stdout.setEncoding("utf-8");
-    pythonProcess.stderr.setEncoding("utf-8");
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
 
-    // Handle Python script output
-    pythonProcess.stdout.on("data", (data) => {
-      console.log(`Python script output: ${data}`);
-    });
+      // Create path and write file in user's directory
+      const filePath = join("uploads", userId, file.name);
+      const absoluteFilePath = join(process.cwd(), filePath);
+      await writeFile(absoluteFilePath, buffer);
 
-    pythonProcess.stderr.on("data", (data) => {
-      console.error(`Python script error: ${data}`);
-    });
+      // Process file with Python script
+      const pythonResult = await new Promise<PythonResult>(
+        (resolve, reject) => {
+          let result = "";
+          let error = "";
+
+          const pythonProcess = spawn("python", [
+            "python/extract_tables.py",
+            absoluteFilePath,
+            userId,
+          ]) as ChildProcessWithoutNullStreams;
+
+          pythonProcess.stdout.setEncoding("utf-8");
+          pythonProcess.stderr.setEncoding("utf-8");
+
+          pythonProcess.stdout.on("data", (data: string) => {
+            result += data;
+          });
+
+          pythonProcess.stderr.on("data", (data: string) => {
+            error += data;
+            console.error(`Python script error: ${data}`);
+          });
+
+          pythonProcess.on("close", (code: number | null) => {
+            if (code === 0) {
+              try {
+                // Try to parse the result as JSON
+                const jsonResult = JSON.parse(result);
+                resolve(jsonResult as PythonResult);
+              } catch {
+                // If parsing fails, check if there were any errors
+                if (error) {
+                  reject(new Error(error));
+                } else {
+                  resolve({
+                    success: true,
+                    message: "Processing completed successfully",
+                    hasData: false,
+                  });
+                }
+              }
+            } else {
+              reject(new Error(error || "Python script failed"));
+            }
+          });
+        }
+      );
+
+      if (!pythonResult.success) {
+        return NextResponse.json(
+          {
+            error: pythonResult.error || `Failed to process file ${file.name}`,
+          },
+          { status: 500 }
+        );
+      }
+
+      // Clean up the file after processing
+      try {
+        await unlink(absoluteFilePath);
+        console.log(`Deleted file: ${absoluteFilePath}`);
+
+        // Delete directory after processing last file
+        if (isLastFile) {
+          await fs.rm(userUploadDir, { recursive: true });
+          console.log(`Deleted directory: ${userUploadDir}`);
+        }
+      } catch (deleteError) {
+        console.error(`Error during cleanup: ${deleteError}`);
+      }
+
+      results.push({
+        fileName: file.name,
+        message: pythonResult.message || "File processed successfully",
+        hasData: pythonResult.hasData,
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      message: "File uploaded and processing started",
+      results,
     });
   } catch (error) {
     console.error("Error in upload:", error);
     return NextResponse.json(
-      { error: "Error uploading file" },
+      { error: "Error uploading files" },
       { status: 500 }
     );
   }

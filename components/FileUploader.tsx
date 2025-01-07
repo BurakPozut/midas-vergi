@@ -12,6 +12,14 @@ interface UploadProgress {
   };
 }
 
+interface TaxResults {
+  profit_loss_by_symbol: { [key: string]: number };
+  total_profit: number;
+  total_loss: number;
+  total_profit_loss: number;
+  total_profit_loss_after_commissions: number;
+}
+
 const getFileIcon = (fileName: string) => {
   const extension = fileName.split('.').pop()?.toLowerCase();
 
@@ -51,6 +59,8 @@ export default function FileUploader() {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showUploadButton, setShowUploadButton] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [taxResults, setTaxResults] = useState<TaxResults | null>(null);
 
   if (status === "loading") {
     return <div>Loading...</div>
@@ -59,6 +69,27 @@ export default function FileUploader() {
   if (!session) {
     return <div>Please sign in to upload files</div>
   }
+
+  const calculateTax = async () => {
+    setIsCalculating(true);
+    try {
+      const response = await fetch('/api/calculate-tax', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to calculate tax');
+      }
+
+      const results = await response.json();
+      setTaxResults(results);
+    } catch (error) {
+      console.error('Error calculating tax:', error);
+      alert('Vergi hesaplanırken bir hata oluştu.');
+    } finally {
+      setIsCalculating(false);
+    }
+  };
 
   const handleFileSelection = (files: FileList | null) => {
     if (files && files.length > 0) {
@@ -92,10 +123,10 @@ export default function FileUploader() {
   };
 
   const uploadFiles = async () => {
-    for (const file of selectedFiles) {
-      const formData = new FormData();
-      formData.append('file', file);
-
+    const formData = new FormData();
+    selectedFiles.forEach(file => {
+      formData.append('files', file);
+      // Initialize progress for each file
       setUploadProgress(prev => ({
         ...prev,
         [file.name]: {
@@ -103,25 +134,31 @@ export default function FileUploader() {
           status: 'uploading'
         }
       }));
+    });
 
-      try {
-        const xhr = new XMLHttpRequest();
+    try {
+      const xhr = new XMLHttpRequest();
 
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = (event.loaded / event.total) * 100;
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const totalProgress = (event.loaded / event.total) * 100;
+          // Update progress for all files
+          selectedFiles.forEach(file => {
             setUploadProgress(prev => ({
               ...prev,
               [file.name]: {
-                progress,
+                progress: totalProgress,
                 status: 'uploading'
               }
             }));
-          }
-        };
+          });
+        }
+      };
 
-        xhr.onload = () => {
-          if (xhr.status === 200) {
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          // Mark all files as completed
+          selectedFiles.forEach(file => {
             setUploadProgress(prev => ({
               ...prev,
               [file.name]: {
@@ -129,7 +166,10 @@ export default function FileUploader() {
                 status: 'completed'
               }
             }));
-          } else {
+          });
+        } else {
+          // Mark all files as error
+          selectedFiles.forEach(file => {
             setUploadProgress(prev => ({
               ...prev,
               [file.name]: {
@@ -137,10 +177,13 @@ export default function FileUploader() {
                 status: 'error'
               }
             }));
-          }
-        };
+          });
+        }
+      };
 
-        xhr.onerror = () => {
+      xhr.onerror = () => {
+        // Mark all files as error on network failure
+        selectedFiles.forEach(file => {
           setUploadProgress(prev => ({
             ...prev,
             [file.name]: {
@@ -148,13 +191,16 @@ export default function FileUploader() {
               status: 'error'
             }
           }));
-        };
+        });
+      };
 
-        xhr.open('POST', '/api/upload');
-        xhr.send(formData);
-        await new Promise((resolve) => xhr.onloadend = resolve);
-      } catch (error) {
-        console.error('Error uploading file:', error);
+      xhr.open('POST', '/api/upload');
+      xhr.send(formData);
+      await new Promise((resolve) => xhr.onloadend = resolve);
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      // Mark all files as error on exception
+      selectedFiles.forEach(file => {
         setUploadProgress(prev => ({
           ...prev,
           [file.name]: {
@@ -162,8 +208,9 @@ export default function FileUploader() {
             status: 'error'
           }
         }));
-      }
+      });
     }
+
     setSelectedFiles([]);
     setShowUploadButton(false);
   };
@@ -284,6 +331,61 @@ export default function FileUploader() {
           </div>
         ))}
       </div>
+
+      {Object.entries(uploadProgress).length > 0 &&
+        Object.entries(uploadProgress).every(([, { status }]) => status === 'completed') && (
+          <div className="mt-6">
+            <button
+              onClick={calculateTax}
+              disabled={isCalculating}
+              className={`w-full py-2 px-4 bg-green-500 text-white rounded-lg transition-colors ${isCalculating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
+                }`}
+            >
+              {isCalculating ? 'Vergi Hesaplanıyor...' : 'Vergi Hesapla'}
+            </button>
+          </div>
+        )}
+
+      {taxResults && (
+        <div className="mt-6 bg-gray-700 p-4 rounded-lg">
+          <h3 className="text-lg font-semibold text-white mb-4">Vergi Hesaplama Sonuçları</h3>
+
+          <div className="space-y-2">
+            <h4 className="text-md font-medium text-gray-300">Sembol Bazında Kar/Zarar:</h4>
+            {Object.entries(taxResults.profit_loss_by_symbol).map(([symbol, profit]) => (
+              <div key={symbol} className="flex justify-between text-sm">
+                <span className="text-gray-400">{symbol}:</span>
+                <span className={`${Number(profit) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {Number(profit).toFixed(2)} TRY
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Toplam Kar:</span>
+              <span className="text-green-400">{taxResults.total_profit.toFixed(2)} TRY</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-400">Toplam Zarar:</span>
+              <span className="text-red-400">{taxResults.total_loss.toFixed(2)} TRY</span>
+            </div>
+            <div className="flex justify-between text-sm font-medium">
+              <span className="text-gray-300">Toplam Kar/Zarar:</span>
+              <span className={`${taxResults.total_profit_loss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {taxResults.total_profit_loss.toFixed(2)} TRY
+              </span>
+            </div>
+            <div className="flex justify-between text-sm font-medium pt-2 border-t border-gray-600">
+              <span className="text-gray-300">Komisyonlar Sonrası Kar/Zarar:</span>
+              <span className={`${taxResults.total_profit_loss_after_commissions >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {taxResults.total_profit_loss_after_commissions.toFixed(2)} TRY
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

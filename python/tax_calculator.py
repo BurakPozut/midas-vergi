@@ -49,6 +49,8 @@ def tax_calculator():
     sell_transactions = df[df["İşlem Tipi"] == "Satış"]
     buy_transactions = df[df["İşlem Tipi"] == "Alış"]
 
+    print(f"sell_transactions + buy_transactions count: {len(sell_transactions) + len(buy_transactions)}")
+
     # Initialize a dictionary to track FIFO queues and profit/loss for each symbol
     fifo_queues = {}
     profit_loss = {}
