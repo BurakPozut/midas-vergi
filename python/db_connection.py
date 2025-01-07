@@ -1,6 +1,8 @@
 from pymongo import MongoClient
 from datetime import datetime
 import locale
+from bson import ObjectId
+
 
 # Set locale to handle Turkish characters
 locale.setlocale(locale.LC_ALL, 'tr_TR.UTF-8')
@@ -21,10 +23,12 @@ def safe_float(value):
         print(f"Error converting value '{value}': {e}")  # Debug print
         return 0.0
 
-def insert_transactions(transactions_df, user_id, source_file):
+def insert_transactions(transactions_df, user_id):
     print("\n in the insert_transactions function")
     transactions_collection = db.Transaction
-
+    
+    transactions_to_insert = []
+    
     for _, row in transactions_df.iterrows():
         try:
             transaction = {
@@ -40,22 +44,27 @@ def insert_transactions(transactions_df, user_id, source_file):
                 "averagePrice": safe_float(row["Ortalama İşlem Fiyatı"]),
                 "transactionFee": safe_float(row["İşlem Ücreti"]),
                 "transactionAmount": safe_float(row["İşlem Tutarı"]),
-                "sourceFile": source_file,
-                "userId": user_id,
+                "userId": ObjectId(user_id),
                 "createdAt": datetime.utcnow(),
                 "updatedAt": datetime.utcnow()
             }
+            transactions_to_insert.append(transaction)
             
-            print(f"\nProcessing transaction:")
-            print(f"Symbol: {transaction['symbol']}")
-            print(f"Average Price: {transaction['averagePrice']}")
-            print(f"Raw Average Price: {row['Ortalama İşlem Fiyatı']}")
-            
-            transactions_collection.insert_one(transaction)
         except Exception as e:
             print(f"Error processing row: {e}")
             print(f"Row data: {row.to_dict()}")
             continue
+    
+    if transactions_to_insert:
+        try:
+            result = transactions_collection.insert_many(transactions_to_insert)
+            print(f"Successfully inserted {len(result.inserted_ids)} transactions")
+            return True
+        except Exception as e:
+            print(f"Error during bulk insert: {e}")
+            return False
+    
+    return False
 
 def get_user_transactions(user_id):
     transactions_collection = db.Transaction

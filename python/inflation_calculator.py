@@ -24,13 +24,13 @@ def get_inflation(year, month):
 
 
 def calculate_inflation(first_year, first_month, second_year, second_month):
-    print(f"Calculating inflation between {months[first_month]} {first_year} and {months[second_month]} {second_year}...")
+    # print(f"Calculating inflation between {months[first_month]} {first_year} and {months[second_month]} {second_year}...")
     inflation_start = get_inflation(first_year, months[first_month])
     inflation_end = get_inflation(second_year, months[second_month])
     
     if inflation_start and inflation_end:
         inflation_rate = (inflation_end - inflation_start) / inflation_start * 100
-        print(f"Inflation rate between {months[first_month]} {first_year} and {months[second_month]} {second_year}: {inflation_rate:.2f}%")
+        # print(f"Inflation rate between {months[first_month]} {first_year} and {months[second_month]} {second_year}: {inflation_rate:.2f}%")
         return inflation_rate
     print("Inflation calculation failed.")
     return None

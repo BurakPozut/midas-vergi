@@ -4,6 +4,7 @@ import os
 import sys
 import locale
 from db_connection import insert_transactions
+import json
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 
@@ -26,7 +27,9 @@ def extract_tables_and_save(pdf_path, user_id, target_title_prefix="YATIRIM İŞ
                         print(f"Found matching table in {pdf_path}")
                         for row in table[2:]:  # Skip header rows
                             if len(row) >= 12:  # Ensure there are enough columns
-                                all_rows.append(row)
+                                # Check if row has any non-None and non-empty values
+                                if any(cell and str(cell).strip() for cell in row):
+                                    all_rows.append(row)
 
         # Define column names
         columns = [
@@ -38,14 +41,30 @@ def extract_tables_and_save(pdf_path, user_id, target_title_prefix="YATIRIM İŞ
         # Create DataFrame
         df = pd.DataFrame(all_rows, columns=columns)
         
-        # Insert into MongoDB
-        if not df.empty:
-            insert_transactions(df, user_id, pdf_path)
+        # If DataFrame is empty, it means no valid transactions were found
+        if df.empty:
+            print(f"No transactions found in {pdf_path}")
+            return {
+                "success": True,
+                "message": f"No transactions found in {pdf_path}",
+                "hasData": False
+            }
+
+        # Insert into MongoDB only if we have valid transactions
+        insert_success = insert_transactions(df, user_id)
+        if insert_success:
             print(f"Data extracted and saved successfully from {pdf_path}")
-            return {"success": True, "message": f"Data extracted and saved successfully from {pdf_path}"}
+            return {
+                "success": True,
+                "message": f"Data extracted and saved successfully from {pdf_path}",
+                "hasData": True
+            }
         else:
-            print("No matching tables found in the PDF")
-            return {"success": False, "error": "No matching tables found in the PDF"}
+            return {
+                "success": False,
+                "error": "Failed to insert transactions into database",
+                "hasData": True
+            }
 
     except Exception as e:
         error_msg = f"Error processing PDF: {str(e)}"
