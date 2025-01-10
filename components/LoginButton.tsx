@@ -9,12 +9,17 @@ export function LoginButton() {
 
   if (session) {
     return (
-      <button
-        onClick={() => signOut()}
-        className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
-      >
-        Çıkış Yap
-      </button>
+      <div className="flex items-center space-x-4">
+        <span className="text-gray-200 font-medium">
+          {session.user?.name || session.user?.email}
+        </span>
+        <button
+          onClick={() => signOut()}
+          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          Çıkış Yap
+        </button>
+      </div>
     )
   }
 

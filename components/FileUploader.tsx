@@ -2,13 +2,16 @@
 
 import { useState } from 'react';
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation";
+import { MissingTransactionsAlert } from './MissingTransactionsAlert';
 
-type UploadStatus = 'uploading' | 'completed' | 'error' | 'selected';
+type UploadStatus = 'uploading' | 'processing' | 'completed' | 'error' | 'selected';
 
 interface UploadProgress {
   [key: string]: {
     progress: number;
     status: UploadStatus;
+    processingMessage?: string;
   };
 }
 
@@ -18,6 +21,7 @@ interface TaxResults {
   total_loss: number;
   total_profit_loss: number;
   total_profit_loss_after_commissions: number;
+  missingBuyTransactions?: string[];
 }
 
 const getFileIcon = (fileName: string) => {
@@ -25,7 +29,7 @@ const getFileIcon = (fileName: string) => {
 
   const iconMap: { [key: string]: JSX.Element } = {
     pdf: (
-      <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-16 h-16 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
       </svg>
     ),
@@ -47,13 +51,14 @@ const getFileIcon = (fileName: string) => {
   };
 
   return iconMap[extension || ''] || (
-    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
     </svg>
   );
 };
 
 export default function FileUploader() {
+  const router = useRouter();
   const { data: session, status } = useSession()
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
   const [isDragging, setIsDragging] = useState(false);
@@ -61,13 +66,15 @@ export default function FileUploader() {
   const [showUploadButton, setShowUploadButton] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [taxResults, setTaxResults] = useState<TaxResults | null>(null);
+  const [showMissingAlert, setShowMissingAlert] = useState(false);
+  const [missingSymbols, setMissingSymbols] = useState<string[]>([]);
 
   if (status === "loading") {
-    return <div>Loading...</div>
+    return <div>Yükleniyor...</div>
   }
 
   if (!session) {
-    return <div>Please sign in to upload files</div>
+    return <div>Dosya yüklemek için lütfen giriş yapın</div>
   }
 
   const calculateTax = async () => {
@@ -82,6 +89,13 @@ export default function FileUploader() {
       }
 
       const results = await response.json();
+
+      // Check for missing buy transactions
+      if (results.missingBuyTransactions && results.missingBuyTransactions.length > 0) {
+        setMissingSymbols(results.missingBuyTransactions);
+        setShowMissingAlert(true);
+      }
+
       setTaxResults(results);
     } catch (error) {
       console.error('Error calculating tax:', error);
@@ -126,7 +140,6 @@ export default function FileUploader() {
     const formData = new FormData();
     selectedFiles.forEach(file => {
       formData.append('files', file);
-      // Initialize progress for each file
       setUploadProgress(prev => ({
         ...prev,
         [file.name]: {
@@ -137,75 +150,90 @@ export default function FileUploader() {
     });
 
     try {
-      const xhr = new XMLHttpRequest();
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const totalProgress = (event.loaded / event.total) * 100;
-          // Update progress for all files
-          selectedFiles.forEach(file => {
-            setUploadProgress(prev => ({
-              ...prev,
-              [file.name]: {
-                progress: totalProgress,
-                status: 'uploading'
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Failed to get response reader');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const events = text.split('\n\n').filter(Boolean);
+
+        for (const event of events) {
+          if (!event.startsWith('data: ')) continue;
+          const data = JSON.parse(event.slice(6));
+
+          switch (data.type) {
+            case 'status':
+              if (data.status === 'processing_start') {
+                setUploadProgress(prev => ({
+                  ...prev,
+                  [data.file]: {
+                    ...prev[data.file],
+                    status: 'processing',
+                    processingMessage: 'İşlem başlatıldı...'
+                  }
+                }));
+              } else if (data.status === 'processing_complete') {
+                setUploadProgress(prev => ({
+                  ...prev,
+                  [data.file]: {
+                    ...prev[data.file],
+                    progress: 100,
+                    status: 'completed',
+                    processingMessage: 'İşlem tamamlandı'
+                  }
+                }));
               }
-            }));
-          });
+              break;
+            case 'processing_progress':
+              setUploadProgress(prev => ({
+                ...prev,
+                [data.file]: {
+                  ...prev[data.file],
+                  processingMessage: data.data
+                }
+              }));
+              break;
+            case 'error':
+              setUploadProgress(prev => ({
+                ...prev,
+                [data.file]: {
+                  ...prev[data.file],
+                  status: 'error',
+                  processingMessage: data.error
+                }
+              }));
+              break;
+            case 'complete':
+              // All files processed
+              break;
+          }
         }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          // Mark all files as completed
-          selectedFiles.forEach(file => {
-            setUploadProgress(prev => ({
-              ...prev,
-              [file.name]: {
-                progress: 100,
-                status: 'completed'
-              }
-            }));
-          });
-        } else {
-          // Mark all files as error
-          selectedFiles.forEach(file => {
-            setUploadProgress(prev => ({
-              ...prev,
-              [file.name]: {
-                progress: 0,
-                status: 'error'
-              }
-            }));
-          });
-        }
-      };
-
-      xhr.onerror = () => {
-        // Mark all files as error on network failure
-        selectedFiles.forEach(file => {
-          setUploadProgress(prev => ({
-            ...prev,
-            [file.name]: {
-              progress: 0,
-              status: 'error'
-            }
-          }));
-        });
-      };
-
-      xhr.open('POST', '/api/upload');
-      xhr.send(formData);
-      await new Promise((resolve) => xhr.onloadend = resolve);
+      }
     } catch (error) {
       console.error('Error uploading files:', error);
-      // Mark all files as error on exception
       selectedFiles.forEach(file => {
         setUploadProgress(prev => ({
           ...prev,
           [file.name]: {
             progress: 0,
-            status: 'error'
+            status: 'error',
+            processingMessage: 'Upload failed'
           }
         }));
       });
@@ -224,6 +252,50 @@ export default function FileUploader() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFileSelection(e.target.files);
+  };
+
+  const renderProgress = (fileName: string) => {
+    const progress = uploadProgress[fileName];
+    if (!progress) return null;
+
+    const getStatusColor = () => {
+      switch (progress.status) {
+        case 'uploading': return 'bg-blue-500';
+        case 'processing': return 'bg-yellow-500';
+        case 'completed': return 'bg-green-500';
+        case 'error': return 'bg-red-500';
+        default: return 'bg-gray-500';
+      }
+    };
+
+    const getStatusText = () => {
+      switch (progress.status) {
+        case 'uploading': return 'Yükleniyor';
+        case 'processing': return 'İşleniyor';
+        case 'completed': return 'Tamamlandı';
+        case 'error': return 'Hata';
+        default: return 'Hazır';
+      }
+    };
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium text-gray-400">
+            {getStatusText()}
+          </span>
+          <span className="text-xs text-gray-400">
+            {progress.progress.toFixed(0)}%
+          </span>
+        </div>
+        <div className="w-full h-2 bg-navy-600 rounded-full overflow-hidden">
+          <div
+            className={`h-2 rounded-full transition-all duration-300 ${getStatusColor()}`}
+            style={{ width: `${progress.progress}%` }}
+          />
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -251,86 +323,78 @@ export default function FileUploader() {
           }}
           onDrop={handleDrop}
         >
-          <span className="flex items-center gap-2">
-            <svg className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          <span className="flex items-center space-x-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <span className="font-medium text-gray-400 text-xs">
-              Dosyaları sürükleyin veya yüklemek için tıklayın
+            <span className="font-medium text-gray-600">
+              Dosyaları sürükleyin veya seçmek için tıklayın
             </span>
           </span>
-          <input
-            id="file-upload"
-            type="file"
-            className="hidden"
-            onChange={handleInputChange}
-            multiple
-            accept=".pdf"
-          />
         </label>
+        <input
+          type="file"
+          id="file-upload"
+          name="file-upload"
+          className="sr-only"
+          onChange={handleInputChange}
+          multiple
+          accept=".pdf"
+        />
       </div>
 
-      {showUploadButton && (
-        <button
-          onClick={uploadFiles}
-          className="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mb-4"
-        >
-          Dosyaları Yükle
-        </button>
-      )}
+      {selectedFiles.length > 0 && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {selectedFiles.map((file, index) => (
+              <div key={index} className="relative flex flex-col bg-navy-700 rounded-lg overflow-hidden shadow-lg">
+                {/* Remove Button - Top Right */}
+                <button
+                  onClick={() => removeSelectedFile(file.name)}
+                  className="absolute top-2 right-2 p-1.5 bg-navy-600 hover:bg-navy-500 rounded-full transition-colors z-10"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
 
-      <div className="space-y-4">
-        {Object.entries(uploadProgress).map(([fileName, { progress, status }]) => (
-          <div
-            key={fileName}
-            className="bg-gray-700 p-4 rounded-lg transform transition-all duration-300 hover:scale-[1.02]"
-          >
-            <div className="flex justify-between items-center mb-2">
-              <div className="flex items-center space-x-3">
-                {getFileIcon(fileName)}
-                <span className="text-sm text-gray-300">{fileName}</span>
+                {/* File Icon and Name Section */}
+                <div className="p-6 flex flex-col items-center">
+                  <div className="mb-4">
+                    {getFileIcon(file.name)}
+                  </div>
+                  <span className="text-sm font-medium text-gray-200 text-center truncate w-full px-4">
+                    {file.name}
+                  </span>
+                </div>
+
+                {/* Progress Section */}
+                <div className="p-4 bg-navy-800">
+                  <div className="space-y-2">
+                    {renderProgress(file.name)}
+                  </div>
+                  {uploadProgress[file.name]?.processingMessage && (
+                    <div className="text-xs text-gray-400 mt-2 max-h-16 overflow-y-auto">
+                      {uploadProgress[file.name].processingMessage}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-sm font-medium ${status === 'error' ? 'text-red-400' :
-                  status === 'completed' ? 'text-green-400' :
-                    status === 'uploading' ? 'text-blue-400' :
-                      'text-gray-400'
-                  }`}>
-                  {status === 'error' ? 'Hata' :
-                    status === 'completed' ? 'Tamamlandı' :
-                      status === 'uploading' ? `${Math.round(progress)}%` :
-                        'Seçildi'}
-                </span>
-                {(status === 'completed' || status === 'selected') && (
-                  <button
-                    onClick={() => removeSelectedFile(fileName)}
-                    className="text-gray-400 hover:text-red-400 transition-colors"
-                    title="Dosyayı Kaldır"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-            {status !== 'selected' && (
-              <div className="w-full bg-gray-600 rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-2 rounded-full transition-all duration-300 ease-out"
-                  style={{
-                    width: `${progress}%`,
-                    background: status === 'error' ? 'rgb(239, 68, 68)' :
-                      status === 'completed' ? 'rgb(34, 197, 94)' :
-                        'linear-gradient(90deg, #3B82F6 0%, #60A5FA 100%)',
-                    boxShadow: progress > 0 ? '0 0 10px rgba(59, 130, 246, 0.7)' : 'none'
-                  }}
-                />
-              </div>
-            )}
+            ))}
           </div>
-        ))}
-      </div>
+
+          {showUploadButton && (
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={uploadFiles}
+                className="px-8 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              >
+                Dosyaları Yükle
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {Object.entries(uploadProgress).length > 0 &&
         Object.entries(uploadProgress).every(([, { status }]) => status === 'completed') && (
@@ -346,8 +410,17 @@ export default function FileUploader() {
           </div>
         )}
 
+      {isCalculating && (
+        <div className="mt-4">
+          <div className="animate-pulse flex space-x-4 items-center">
+            <div className="h-3 w-3 bg-blue-400 rounded-full"></div>
+            <div className="text-sm text-gray-400">Vergi hesaplanıyor...</div>
+          </div>
+        </div>
+      )}
+
       {taxResults && (
-        <div className="mt-6 bg-gray-700 p-4 rounded-lg">
+        <div className="mt-4 space-y-4 bg-navy-700 p-4 rounded-lg">
           <h3 className="text-lg font-semibold text-white mb-4">Vergi Hesaplama Sonuçları</h3>
 
           <div className="space-y-2">
@@ -356,7 +429,7 @@ export default function FileUploader() {
               <div key={symbol} className="flex justify-between text-sm">
                 <span className="text-gray-400">{symbol}:</span>
                 <span className={`${Number(profit) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {Number(profit).toFixed(2)} TRY
+                  {Number(profit).toFixed(2)} TL
                 </span>
               </div>
             ))}
@@ -365,27 +438,35 @@ export default function FileUploader() {
           <div className="mt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Toplam Kar:</span>
-              <span className="text-green-400">{taxResults.total_profit.toFixed(2)} TRY</span>
+              <span className="text-green-400">{taxResults.total_profit.toFixed(2)} TL</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">Toplam Zarar:</span>
-              <span className="text-red-400">{taxResults.total_loss.toFixed(2)} TRY</span>
+              <span className="text-red-400">{taxResults.total_loss.toFixed(2)} TL</span>
             </div>
             <div className="flex justify-between text-sm font-medium">
               <span className="text-gray-300">Toplam Kar/Zarar:</span>
               <span className={`${taxResults.total_profit_loss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {taxResults.total_profit_loss.toFixed(2)} TRY
+                {taxResults.total_profit_loss.toFixed(2)} TL
               </span>
             </div>
             <div className="flex justify-between text-sm font-medium pt-2 border-t border-gray-600">
               <span className="text-gray-300">Komisyonlar Sonrası Kar/Zarar:</span>
               <span className={`${taxResults.total_profit_loss_after_commissions >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {taxResults.total_profit_loss_after_commissions.toFixed(2)} TRY
+                {taxResults.total_profit_loss_after_commissions.toFixed(2)} TL
               </span>
             </div>
           </div>
         </div>
       )}
+
+      <MissingTransactionsAlert
+        symbols={missingSymbols}
+        onContinue={() => setShowMissingAlert(false)}
+        onUpload={() => router.push('/upload')}
+        open={showMissingAlert}
+        onOpenChange={setShowMissingAlert}
+      />
     </div>
   );
 } 

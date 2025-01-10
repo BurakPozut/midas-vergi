@@ -16,6 +16,7 @@ interface ProfitLossResult {
   total_loss: number;
   total_profit_loss: number;
   total_profit_loss_after_commissions: number;
+  missingBuyTransactions?: string[];
 }
 
 const INFLATION_THRESHOLD = 10;
@@ -29,6 +30,9 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.log("Processing tax calculation for user:", userId);
+
+    // Add array to track missing buy transactions
+    const missingBuyTransactions: string[] = [];
 
     // Get all transactions for the user
     const transactions = await db.transaction.findMany({
@@ -124,6 +128,9 @@ export async function POST() {
 
       if (!fifoQueues[symbol] || !fifoQueues[symbol].length) {
         console.log(`No buy transactions found for ${symbol}, skipping`);
+        if (!missingBuyTransactions.includes(symbol)) {
+          missingBuyTransactions.push(symbol);
+        }
         continue;
       }
 
@@ -220,6 +227,8 @@ export async function POST() {
       total_loss: netLoss,
       total_profit_loss: totalPL,
       total_profit_loss_after_commissions: finalPL,
+      missingBuyTransactions:
+        missingBuyTransactions.length > 0 ? missingBuyTransactions : undefined,
     };
 
     return NextResponse.json(result);

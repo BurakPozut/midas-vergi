@@ -1,17 +1,20 @@
-import { auth } from "@/auth";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const isOnDashboard = req.nextUrl.pathname.startsWith("/dashboard");
-  const isOnProfile = req.nextUrl.pathname.startsWith("/profile");
-  const isOnUpload = req.nextUrl.pathname.startsWith("/upload");
+export async function middleware(request: NextRequest) {
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET,
+  });
 
-  if (!isLoggedIn && (isOnDashboard || isOnProfile || isOnUpload)) {
-    return Response.redirect(new URL("/api/auth/signin", req.url));
+  if (!token) {
+    return NextResponse.redirect(new URL("/auth/signin", request.url));
   }
-});
 
-// Optionally configure middleware
+  return NextResponse.next();
+}
+
 export const config = {
-  matcher: ["/dashboard/:path*", "/profile/:path*", "/upload/:path*"],
+  matcher: ["/tax"],
 };
