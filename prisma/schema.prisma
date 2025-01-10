@@ -13,6 +13,7 @@ model User {
   password     String
   name         String?
   transactions Transaction[]
+  dividends    Dividend[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -58,4 +59,17 @@ model YiUfe {
   ekim    Float  @map("EKİM")
   kasim   Float  @map("KASIM")
   aralik  Float? @map("ARALIK") // Optional since December might not be available yet
+}
+
+model Dividend {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  paymentDate DateTime @map("Ödeme Tarihi")
+  symbol      String   @map("Sermaya Piyasası Aracı")
+  grossAmount Float    @map("Brüt Temettü Tutarı")
+  taxWithheld Float    @map("Stopaj")
+  netAmount   Float    @map("Net Temettü Tutarı")
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

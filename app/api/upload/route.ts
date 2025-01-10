@@ -18,136 +18,187 @@ export async function POST(req: Request) {
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
     }
 
     const data = await req.formData();
     const files = data.getAll("files") as File[];
 
     if (!files || files.length === 0) {
-      return NextResponse.json({ error: "No files provided" }, { status: 400 });
+      return NextResponse.json({ error: "Dosya seçilmedi" }, { status: 400 });
     }
 
-    // Create user-specific directory: uploads/[userId]
-    const userUploadDir = join(process.cwd(), "uploads", userId);
-    try {
-      await fs.mkdir(userUploadDir, { recursive: true });
-    } catch (err) {
-      console.error("Error creating user upload directory:", err);
-      return NextResponse.json(
-        { error: "Failed to create upload directory" },
-        { status: 500 }
-      );
-    }
+    // Create a TransformStream for sending progress updates
+    const stream = new TransformStream();
+    const writer = stream.writable.getWriter();
+    const encoder = new TextEncoder();
 
-    const results = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const isLastFile = i === files.length - 1;
-
-      // Validate file type
-      if (file.type !== "application/pdf") {
-        return NextResponse.json(
-          { error: `File ${file.name} is not a PDF` },
-          { status: 400 }
-        );
-      }
-
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-
-      // Create path and write file in user's directory
-      const filePath = join("uploads", userId, file.name);
-      const absoluteFilePath = join(process.cwd(), filePath);
-      await writeFile(absoluteFilePath, buffer);
-
-      // Process file with Python script
-      const pythonResult = await new Promise<PythonResult>(
-        (resolve, reject) => {
-          let result = "";
-          let error = "";
-
-          const pythonProcess = spawn("python", [
-            "python/extract_tables.py",
-            absoluteFilePath,
-            userId,
-          ]) as ChildProcessWithoutNullStreams;
-
-          pythonProcess.stdout.setEncoding("utf-8");
-          pythonProcess.stderr.setEncoding("utf-8");
-
-          pythonProcess.stdout.on("data", (data: string) => {
-            result += data;
-          });
-
-          pythonProcess.stderr.on("data", (data: string) => {
-            error += data;
-            console.error(`Python script error: ${data}`);
-          });
-
-          pythonProcess.on("close", (code: number | null) => {
-            if (code === 0) {
-              try {
-                // Try to parse the result as JSON
-                const jsonResult = JSON.parse(result);
-                resolve(jsonResult as PythonResult);
-              } catch {
-                // If parsing fails, check if there were any errors
-                if (error) {
-                  reject(new Error(error));
-                } else {
-                  resolve({
-                    success: true,
-                    message: "Processing completed successfully",
-                    hasData: false,
-                  });
-                }
-              }
-            } else {
-              reject(new Error(error || "Python script failed"));
-            }
-          });
-        }
-      );
-
-      if (!pythonResult.success) {
-        return NextResponse.json(
-          {
-            error: pythonResult.error || `Failed to process file ${file.name}`,
-          },
-          { status: 500 }
-        );
-      }
-
-      // Clean up the file after processing
-      try {
-        await unlink(absoluteFilePath);
-        console.log(`Deleted file: ${absoluteFilePath}`);
-
-        // Delete directory after processing last file
-        if (isLastFile) {
-          await fs.rm(userUploadDir, { recursive: true });
-          console.log(`Deleted directory: ${userUploadDir}`);
-        }
-      } catch (deleteError) {
-        console.error(`Error during cleanup: ${deleteError}`);
-      }
-
-      results.push({
-        fileName: file.name,
-        message: pythonResult.message || "File processed successfully",
-        hasData: pythonResult.hasData,
-      });
-    }
-
-    return NextResponse.json({
-      success: true,
-      results,
+    // Start the response early
+    const response = new Response(stream.readable, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
+
+    // Process files in the background
+    (async () => {
+      try {
+        // Create user-specific directory: uploads/[userId]
+        const userUploadDir = join(process.cwd(), "uploads", userId);
+        await fs.mkdir(userUploadDir, { recursive: true });
+
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const isLastFile = i === files.length - 1;
+
+          // Send upload start event
+          await writer.write(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "status",
+                file: file.name,
+                status: "processing_start",
+              })}\n\n`
+            )
+          );
+
+          // Validate file type
+          if (file.type !== "application/pdf") {
+            await writer.write(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  file: file.name,
+                  error: "PDF dosyası değil",
+                })}\n\n`
+              )
+            );
+            continue;
+          }
+
+          const bytes = await file.arrayBuffer();
+          const buffer = Buffer.from(bytes);
+
+          // Create path and write file in user's directory
+          const filePath = join("uploads", userId, file.name);
+          const absoluteFilePath = join(process.cwd(), filePath);
+          await writeFile(absoluteFilePath, buffer);
+
+          // Process file with Python script
+          const pythonResult = await new Promise<PythonResult>(
+            (resolve, reject) => {
+              let result = "";
+              let error = "";
+
+              const pythonProcess = spawn("python", [
+                "python/extract_tables.py",
+                absoluteFilePath,
+                userId,
+              ]) as ChildProcessWithoutNullStreams;
+
+              pythonProcess.stdout.setEncoding("utf-8");
+              pythonProcess.stderr.setEncoding("utf-8");
+
+              pythonProcess.stdout.on("data", async (data: string) => {
+                result += data;
+                // Send processing progress event
+                await writer.write(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "processing_progress",
+                      file: file.name,
+                      data: data.toString(),
+                    })}\n\n`
+                  )
+                );
+              });
+
+              pythonProcess.stderr.on("data", async (data: string) => {
+                error += data;
+                console.error(`Python script error: ${data}`);
+                await writer.write(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "error",
+                      file: file.name,
+                      error: "İşlem sırasında hata oluştu: " + data.toString(),
+                    })}\n\n`
+                  )
+                );
+              });
+
+              pythonProcess.on("close", (code: number | null) => {
+                if (code === 0) {
+                  try {
+                    const jsonResult = JSON.parse(result);
+                    resolve(jsonResult as PythonResult);
+                  } catch {
+                    if (error) {
+                      reject(new Error(error));
+                    } else {
+                      resolve({
+                        success: true,
+                        message: "İşlem başarıyla tamamlandı",
+                        hasData: false,
+                      });
+                    }
+                  }
+                } else {
+                  reject(new Error(error || "Python script çalıştırılamadı"));
+                }
+              });
+            }
+          );
+
+          // Send completion event
+          await writer.write(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "status",
+                file: file.name,
+                status: "processing_complete",
+                result: pythonResult,
+              })}\n\n`
+            )
+          );
+
+          // Clean up the file after processing
+          try {
+            await unlink(absoluteFilePath);
+            if (isLastFile) {
+              await fs.rm(userUploadDir, { recursive: true });
+            }
+          } catch (deleteError) {
+            console.error(`Error during cleanup: ${deleteError}`);
+          }
+        }
+
+        // Close the stream when all files are processed
+        await writer.write(
+          encoder.encode(`data: ${JSON.stringify({ type: "complete" })}\n\n`)
+        );
+        await writer.close();
+      } catch (error) {
+        await writer.write(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "error",
+              error:
+                error instanceof Error ? error.message : "Dosya işleme hatası",
+            })}\n\n`
+          )
+        );
+        await writer.close();
+      }
+    })();
+
+    return response;
   } catch (error) {
     console.error("Error in upload:", error);
     return NextResponse.json(
-      { error: "Error uploading files" },
+      { error: "Dosya yükleme hatası" },
       { status: 500 }
     );
   }

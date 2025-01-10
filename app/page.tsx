@@ -1,8 +1,17 @@
-import FileUploader from '../components/FileUploader';
+import FlickeringGrid from '@/components/ui/flickering-grid';
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-navy-900">
+    <div className="relative min-h-screen bg-gradient-to-b from-gray-900 to-navy-900">
+      <FlickeringGrid
+        className="z-0 absolute inset-0 [mask-image:radial-gradient(450px_circle_at_center,white,transparent)]"
+        squareSize={4}
+        gridGap={6}
+        color="#60A5FA"
+        maxOpacity={0.5}
+        flickerChance={0.1}
+      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-28">
         {/* Hero Section */}
         <div className="text-center space-y-8 mb-16">
@@ -12,10 +21,31 @@ export default function Home() {
           <p className="animate-fade-in animation-delay-200 text-gray-400 text-lg md:text-xl max-w-2xl mx-auto">
             Otomatik aracımızla ABD hisse senedi vergi hesaplamalarınızı kolaylaştırın. Sadece işlem dökümünüzü yükleyin ve gerisini bize bırakın.
           </p>
+          <div className="animate-fade-in animation-delay-400">
+            <Link
+              href="/tax"
+              className="inline-flex items-center px-12 py-6 text-xl font-semibold text-white bg-gradient-to-r from-blue-500 to-emerald-500 rounded-xl hover:from-blue-600 hover:to-emerald-600 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+            >
+              Vergini Hesapla
+              <svg
+                className="ml-2 -mr-1 w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M13 7l5 5m0 0l-5 5m5-5H6"
+                />
+              </svg>
+            </Link>
+          </div>
         </div>
 
         {/* Features Grid */}
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           {[
             {
               title: "Otomatik Hesaplama",
@@ -54,14 +84,6 @@ export default function Home() {
               <p className="text-gray-400">{feature.description}</p>
             </div>
           ))}
-        </div>
-
-        {/* Upload Section */}
-        <div className="animate-fade-in animation-delay-400 bg-gray-800 rounded-lg p-8 shadow-xl">
-          <h2 className="text-2xl font-bold text-white mb-4">
-            Dökümünüzü Yükleyin
-          </h2>
-          <FileUploader />
         </div>
       </div>
     </div>
