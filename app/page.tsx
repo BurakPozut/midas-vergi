@@ -1,16 +1,16 @@
-import FlickeringGrid from '@/components/ui/flickering-grid';
+import { Squares } from '@/components/ui/squares-background';
 import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-900 to-navy-900">
-      <FlickeringGrid
-        className="z-0 absolute inset-0 [mask-image:radial-gradient(450px_circle_at_center,white,transparent)]"
-        squareSize={4}
-        gridGap={6}
-        color="#60A5FA"
-        maxOpacity={0.5}
-        flickerChance={0.1}
+    <div className="relative min-h-screen ">
+      <Squares
+        direction="diagonal"
+        speed={0.3}
+        squareSize={40}
+        borderColor="#333"
+        hoverFillColor="#222"
+        className='z-0 absolute inset-0'
       />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-28">
         {/* Hero Section */}
@@ -24,7 +24,7 @@ export default function Home() {
           <div className="animate-fade-in animation-delay-400">
             <Link
               href="/tax"
-              className="inline-flex items-center px-12 py-6 text-xl font-semibold text-white bg-gradient-to-r from-blue-500 to-emerald-500 rounded-xl hover:from-blue-600 hover:to-emerald-600 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+              className="inline-flex items-center px-12 py-6 text-xl font-semibold text-white bg-blue-500 rounded-xl  transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
             >
               Vergini Hesapla
               <svg

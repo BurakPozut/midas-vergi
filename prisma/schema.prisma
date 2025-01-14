@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  id           String        @id @default(uuid()) // Auto-incrementing primary key
   email        String        @unique
   password     String
   name         String?
@@ -19,57 +19,133 @@ model User {
 }
 
 model Transaction {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  id                Int      @id @default(autoincrement())
   date              DateTime
-  transactionType   String // İşlem Türü
-  symbol            String // Sembol
-  operationType     String // İşlem Tipi
-  status            String // İşlem Durumu
-  currency          String // Para Birimi
-  orderQuantity     Float // Emir Adedi
-  orderAmount       Float // Emir Tutarı
-  executedQuantity  Float // Gerçekleşen Adet
-  averagePrice      Float // Ortalama İşlem Fiyatı
-  transactionFee    Float // İşlem Ücreti
-  transactionAmount Float // İşlem Tutarı
-  userId            String   @db.ObjectId
+  transactionType   String
+  symbol            String
+  operationType     String
+  status            String
+  currency          String
+  orderQuantity     Float
+  orderAmount       Float
+  executedQuantity  Float
+  averagePrice      Float
+  transactionFee    Float
+  transactionAmount Float
+  userId            String
   user              User     @relation(fields: [userId], references: [id])
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
 
 model Dolar {
-  id                 String @id @default(auto()) @map("_id") @db.ObjectId
-  gecerliOlduguTarih String @map("Gecerli Oldugu Tarih") // Format: DD.MM.YYYY
-  dovizAlis          Float  @map("Doviz Alis")
+  id                 Int    @id @default(autoincrement())
+  gecerliOlduguTarih String
+  dovizAlis          Float
 }
 
 model YiUfe {
-  id      String @id @default(auto()) @map("_id") @db.ObjectId
-  yil     Int    @map("YIL")
-  ocak    Float  @map("OCAK")
-  subat   Float  @map("ŞUBAT")
-  mart    Float  @map("MART")
-  nisan   Float  @map("NİSAN")
-  mayis   Float  @map("MAYIS")
-  haziran Float  @map("HAZİRAN")
-  temmuz  Float  @map("TEMMUZ")
-  agustos Float  @map("AĞUSTOS")
-  eylul   Float  @map("EYLÜL")
-  ekim    Float  @map("EKİM")
-  kasim   Float  @map("KASIM")
-  aralik  Float? @map("ARALIK") // Optional since December might not be available yet
+  id      Int    @id @default(autoincrement())
+  yil     Int
+  ocak    Float
+  subat   Float
+  mart    Float
+  nisan   Float
+  mayis   Float
+  haziran Float
+  temmuz  Float
+  agustos Float
+  eylul   Float
+  ekim    Float
+  kasim   Float
+  aralik  Float?
 }
 
 model Dividend {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  paymentDate DateTime @map("Ödeme Tarihi")
-  symbol      String   @map("Sermaya Piyasası Aracı")
-  grossAmount Float    @map("Brüt Temettü Tutarı")
-  taxWithheld Float    @map("Stopaj")
-  netAmount   Float    @map("Net Temettü Tutarı")
-  userId      String   @db.ObjectId
+  id          Int      @id @default(autoincrement())
+  paymentDate DateTime
+  symbol      String
+  grossAmount Float
+  taxWithheld Float
+  netAmount   Float
+  userId      String
   user        User     @relation(fields: [userId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+// generator client {
+//   provider = "prisma-client-js"
+// }
+
+// datasource db {
+//   provider = "mongodb"
+//   url      = env("DATABASE_URL")
+// }
+
+// model User {
+//   id           String        @id @default(auto()) @map("_id") @db.ObjectId
+//   email        String        @unique
+//   password     String
+//   name         String?
+//   transactions Transaction[]
+//   dividends    Dividend[]
+//   createdAt    DateTime      @default(now())
+//   updatedAt    DateTime      @updatedAt
+// }
+
+// model Transaction {
+//   id                String   @id @default(auto()) @map("_id") @db.ObjectId
+//   date              DateTime
+//   transactionType   String // İşlem Türü
+//   symbol            String // Sembol
+//   operationType     String // İşlem Tipi
+//   status            String // İşlem Durumu
+//   currency          String // Para Birimi
+//   orderQuantity     Float // Emir Adedi
+//   orderAmount       Float // Emir Tutarı
+//   executedQuantity  Float // Gerçekleşen Adet
+//   averagePrice      Float // Ortalama İşlem Fiyatı
+//   transactionFee    Float // İşlem Ücreti
+//   transactionAmount Float // İşlem Tutarı
+//   userId            String   @db.ObjectId
+//   user              User     @relation(fields: [userId], references: [id])
+//   createdAt         DateTime @default(now())
+//   updatedAt         DateTime @updatedAt
+// }
+
+// model Dolar {
+//   id                 String @id @default(auto()) @map("_id") @db.ObjectId
+//   gecerliOlduguTarih String @map("Gecerli Oldugu Tarih") // Format: DD.MM.YYYY
+//   dovizAlis          Float  @map("Doviz Alis")
+// }
+
+// model YiUfe {
+//   id      String @id @default(auto()) @map("_id") @db.ObjectId
+//   yil     Int    @map("YIL")
+//   ocak    Float  @map("OCAK")
+//   subat   Float  @map("ŞUBAT")
+//   mart    Float  @map("MART")
+//   nisan   Float  @map("NİSAN")
+//   mayis   Float  @map("MAYIS")
+//   haziran Float  @map("HAZİRAN")
+//   temmuz  Float  @map("TEMMUZ")
+//   agustos Float  @map("AĞUSTOS")
+//   eylul   Float  @map("EYLÜL")
+//   ekim    Float  @map("EKİM")
+//   kasim   Float  @map("KASIM")
+//   aralik  Float? @map("ARALIK") // Optional since December might not be available yet
+// }
+
+// model Dividend {
+//   id          String   @id @default(auto()) @map("_id") @db.ObjectId
+//   paymentDate DateTime @map("Ödeme Tarihi")
+//   symbol      String   @map("Sermaya Piyasası Aracı")
+//   grossAmount Float    @map("Brüt Temettü Tutarı")
+//   taxWithheld Float    @map("Stopaj")
+//   netAmount   Float    @map("Net Temettü Tutarı")
+//   userId      String   @db.ObjectId
+//   user        User     @relation(fields: [userId], references: [id])
+//   createdAt   DateTime @default(now())
+//   updatedAt   DateTime @updatedAt
+// }
