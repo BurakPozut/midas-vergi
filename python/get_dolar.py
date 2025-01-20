@@ -1,16 +1,30 @@
-# Provide the connection details
-from db_connection import db
+from db_connection import get_db_connection
 
 def get_dolar(tarih):
-    # Access a specific collection
-    collection = db['Dolar']  # Replace 'my_collection' with your collection name
-    # Query to find the document by "Gecerli Oldugu Tarih"
-    query = {"Gecerli Oldugu Tarih": tarih}
-    result = collection.find_one(query, {"_id": 0, "Doviz Alis": 1})
-
-    # Print the result
-    if result:
-        # print("Document found:", result.get("Doviz Alis"))
-        return result.get("Doviz Alis")
-    else:
-        print("No document found with the specified 'Gecerli Oldugu Tarih'")
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        
+        print(f"\n🔍 Looking up exchange rate for date: {tarih}")
+        # Query to find the exchange rate for the given date
+        query = "SELECT dovizAlis FROM Dolar WHERE gecerliOlduguTarih = %s"
+        cursor.execute(query, (tarih,))
+        
+        result = cursor.fetchone()
+        
+        if result:
+            rate = result['dovizAlis']
+            print(f"💱 Exchange rate found: {rate}")
+            return rate
+        else:
+            print(f"⚠️  No exchange rate found for date: {tarih}")
+            return None
+            
+    except Exception as e:
+        print(f"\n❌ Error getting exchange rate: {e}")
+        return None
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'connection' in locals():
+            connection.close()
