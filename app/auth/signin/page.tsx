@@ -26,8 +26,9 @@ export default function SignIn() {
 
       if (result?.error) {
         setError('Email veya şifre hatalı')
+      } else if (result?.ok) {
+        window.location.href = '/'
       }
-      window.location.href = '/';
     } catch (err) {
       setError('Bir hata oluştu')
       console.error(err)

@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { spawn } from "child_process";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import fs from "fs/promises";
+import { db } from "@/lib/prisma";
 
 interface PythonResult {
   success: boolean;
@@ -21,11 +22,49 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
     }
 
+    // Check if user has enough usage left
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { usage: true },
+    });
+
+    if (!user || user.usage <= 0) {
+      return NextResponse.json(
+        { error: "Kullanım hakkınız kalmadı." },
+        { status: 403 }
+      );
+    }
+
+    // Decrease usage by 1
+    await db.user.update({
+      where: { id: userId },
+      data: { usage: { decrement: 1 } },
+    });
+
     const data = await req.formData();
     const files = data.getAll("files") as File[];
 
     if (!files || files.length === 0) {
       return NextResponse.json({ error: "Dosya seçilmedi" }, { status: 400 });
+    }
+
+    // Check file count limit
+    if (files.length > 36) {
+      return NextResponse.json(
+        { error: "En fazla 36 dosya yükleyebilirsiniz" },
+        { status: 400 }
+      );
+    }
+
+    // Calculate total size
+    const totalSize = files.reduce((acc, file) => acc + file.size, 0);
+    const maxSize = 1200 * 1024; // 1,200 KB in bytes
+
+    if (totalSize > maxSize) {
+      return NextResponse.json(
+        { error: "Toplam dosya boyutu 1,200 KB'ı geçemez" },
+        { status: 400 }
+      );
     }
 
     // Create a TransformStream for sending progress updates
