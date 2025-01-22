@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useSession } from "next-auth/react"
 import { MissingTransactionsAlert } from './MissingTransactionsAlert';
+import UsageDisplay from './UsageDisplay';
 
 type UploadStatus = 'uploading' | 'processing' | 'completed' | 'error' | 'selected';
 
@@ -72,6 +73,8 @@ export default function FileUploader() {
   const [showMissingAlert, setShowMissingAlert] = useState(false);
   const [missingSymbols, setMissingSymbols] = useState<string[]>([]);
   const [isResetting, setIsResetting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshUsage, setRefreshUsage] = useState(0);
 
   if (status === "loading") {
     return <div>Yükleniyor...</div>
@@ -129,6 +132,8 @@ export default function FileUploader() {
       }
 
       setTaxResults(results);
+      // Trigger usage refresh
+      setRefreshUsage(prev => prev + 1);
     } catch (error) {
       console.error('Error calculating tax:', error);
       alert('Vergi hesaplanırken bir hata oluştu.');
@@ -139,6 +144,22 @@ export default function FileUploader() {
 
   const handleFileSelection = (files: FileList | null) => {
     if (files && files.length > 0) {
+      setError(null); // Clear any previous errors
+      // Check file count limit
+      if (files.length > 36) {
+        setError('En fazla 36 dosya yükleyebilirsiniz.');
+        return;
+      }
+
+      // Calculate total size of selected files
+      const totalSize = Array.from(files).reduce((acc, file) => acc + file.size, 0);
+      const maxSize = 1200 * 1024; // 1,200 KB in bytes
+
+      if (totalSize > maxSize) {
+        setError('Toplam dosya boyutu 1,200 KB\'ı geçemez.');
+        return;
+      }
+
       const newFiles = Array.from(files).filter(file => file.type === 'application/pdf');
       setSelectedFiles(prev => [...prev, ...newFiles]);
 
@@ -155,6 +176,7 @@ export default function FileUploader() {
   };
 
   const uploadFiles = async () => {
+    setError(null); // Clear any previous errors
     const formData = new FormData();
     selectedFiles.forEach(file => {
       formData.append('files', file);
@@ -174,7 +196,8 @@ export default function FileUploader() {
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        const data = await response.json();
+        throw new Error(data.error || 'Upload failed');
       }
 
       const reader = response.body?.getReader();
@@ -245,6 +268,7 @@ export default function FileUploader() {
       }
     } catch (error) {
       console.error('Error uploading files:', error);
+      setError(error instanceof Error ? error.message : 'Dosya yükleme hatası');
       selectedFiles.forEach(file => {
         setUploadProgress(prev => ({
           ...prev,
@@ -316,207 +340,220 @@ export default function FileUploader() {
   };
 
   return (
-    <div className="space-y-6">
-      {isResetting && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="animate-pulse flex space-x-4 items-center bg-navy-800 rounded-lg p-4">
-            <div className="h-3 w-3 bg-blue-400 rounded-full"></div>
-            <div className="text-sm text-gray-400">Veriler sıfırlanıyor...</div>
+    <div className="w-full max-w-3xl mx-auto p-4">
+      <UsageDisplay refreshTrigger={refreshUsage} />
+      <div className="space-y-6">
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span className="text-red-500 text-sm font-medium">{error}</span>
+            </div>
           </div>
-        </div>
-      )}
-      {!isCalculating && (
-        <>
-          <div className="mb-6">
-            <label
-              htmlFor="file-upload"
-              className={`flex justify-center w-full h-16 px-4 transition-all duration-300 bg-navy-800 border-2 
-                ${isDragging ? 'border-blue-500 scale-105' : 'border-gray-600'} 
-                border-dashed rounded-lg appearance-none cursor-pointer hover:border-gray-500 focus:outline-none items-center`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragging(true);
-              }}
-              onDragEnter={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragging(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragging(false);
-              }}
-              onDrop={handleDrop}
-            >
-              <span className="flex items-center space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <span className="font-medium text-gray-600">
-                  Dosyaları sürükleyin veya seçmek için tıklayın
-                </span>
-              </span>
-            </label>
-            <input
-              type="file"
-              id="file-upload"
-              name="file-upload"
-              className="sr-only"
-              onChange={handleInputChange}
-              multiple
-              accept=".pdf"
-            />
+        )}
+        {isResetting && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="animate-pulse flex space-x-4 items-center bg-navy-800 rounded-lg p-4">
+              <div className="h-3 w-3 bg-blue-400 rounded-full"></div>
+              <div className="text-sm text-gray-400">Veriler sıfırlanıyor...</div>
+            </div>
           </div>
-
-          {selectedFiles.length > 0 && (
-            <div className="flex justify-end mb-6">
-              <button
-                onClick={uploadFiles}
-                className="px-8 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+        )}
+        {!isCalculating && (
+          <>
+            <div className="mb-6">
+              <label
+                htmlFor="file-upload"
+                className={`flex justify-center w-full h-16 px-4 transition-all duration-300 bg-navy-800 border-2 
+                  ${isDragging ? 'border-blue-500 scale-105' : 'border-gray-600'} 
+                  border-dashed rounded-lg appearance-none cursor-pointer hover:border-gray-500 focus:outline-none items-center`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                }}
+                onDrop={handleDrop}
               >
-                Dosyaları Yükle
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {Object.keys(uploadProgress).length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Object.entries(uploadProgress).map(([fileName, progress]) => (
-            <div key={fileName} className="relative flex flex-col bg-navy-700 rounded-lg overflow-hidden shadow-lg">
-              <div className="p-6 flex flex-col items-center">
-                <div className="mb-4">
-                  {getFileIcon(fileName)}
-                </div>
-                <span className="text-sm font-medium text-gray-200 text-center truncate w-full px-4">
-                  {fileName}
+                <span className="flex items-center space-x-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <span className="font-medium text-gray-600">
+                    Dosyaları sürükleyin veya seçmek için tıklayın
+                  </span>
                 </span>
-              </div>
-
-              <div className="p-4 bg-navy-800">
-                <div className="space-y-2">
-                  {renderProgress(fileName)}
-                </div>
-                {progress?.processingMessage && (
-                  <div className="text-xs text-gray-400 mt-2 max-h-16 overflow-y-auto">
-                    {progress.processingMessage}
-                  </div>
-                )}
-              </div>
+              </label>
+              <input
+                type="file"
+                id="file-upload"
+                name="file-upload"
+                className="sr-only"
+                onChange={handleInputChange}
+                multiple
+                accept=".pdf"
+              />
             </div>
-          ))}
-        </div>
-      )}
 
-      {Object.entries(uploadProgress).length > 0 &&
-        Object.entries(uploadProgress).every(([, { status }]) => status === 'completed') && (
-          <div className="mt-6">
-            <button
-              onClick={calculateTax}
-              disabled={isCalculating}
-              className={`w-full py-2 px-4 bg-green-500 text-white rounded-lg transition-colors ${isCalculating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
-                }`}
-            >
-              {isCalculating ? 'Vergi Hesaplanıyor...' : 'Vergi Hesapla'}
-            </button>
+            {selectedFiles.length > 0 && (
+              <div className="flex justify-end mb-6">
+                <button
+                  onClick={uploadFiles}
+                  className="px-8 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                >
+                  Dosyaları Yükle
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {Object.keys(uploadProgress).length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Object.entries(uploadProgress).map(([fileName, progress]) => (
+              <div key={fileName} className="relative flex flex-col bg-navy-700 rounded-lg overflow-hidden shadow-lg">
+                <div className="p-6 flex flex-col items-center">
+                  <div className="mb-4">
+                    {getFileIcon(fileName)}
+                  </div>
+                  <span className="text-sm font-medium text-gray-200 text-center truncate w-full px-4">
+                    {fileName}
+                  </span>
+                </div>
+
+                <div className="p-4 bg-navy-800">
+                  <div className="space-y-2">
+                    {renderProgress(fileName)}
+                  </div>
+                  {progress?.processingMessage && (
+                    <div className="text-xs text-gray-400 mt-2 max-h-16 overflow-y-auto">
+                      {progress.processingMessage}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-      {isCalculating && (
-        <div className="mt-4">
-          <div className="animate-pulse flex space-x-4 items-center">
-            <div className="h-3 w-3 bg-blue-400 rounded-full"></div>
-            <div className="text-sm text-gray-400">Vergi hesaplanıyor...</div>
+        {Object.entries(uploadProgress).length > 0 &&
+          Object.entries(uploadProgress).every(([, { status }]) => status === 'completed') && (
+            <div className="mt-6">
+              <button
+                onClick={calculateTax}
+                disabled={isCalculating}
+                className={`w-full py-2 px-4 bg-green-500 text-white rounded-lg transition-colors ${isCalculating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-600'
+                  }`}
+              >
+                {isCalculating ? 'Vergi Hesaplanıyor...' : 'Vergi Hesapla'}
+              </button>
+            </div>
+          )}
+
+        {isCalculating && (
+          <div className="mt-4">
+            <div className="animate-pulse flex space-x-4 items-center">
+              <div className="h-3 w-3 bg-blue-400 rounded-full"></div>
+              <div className="text-sm text-gray-400">Vergi hesaplanıyor...</div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {taxResults && (
-        <div className="mt-4 space-y-4 bg-navy-700 p-4 rounded-lg">
-          <h3 className="text-lg font-semibold text-white mb-4">Vergi Hesaplama Sonuçları</h3>
+        {taxResults && (
+          <div className="mt-4 space-y-4 bg-navy-700 p-4 rounded-lg">
+            <h3 className="text-lg font-semibold text-white mb-4">Vergi Hesaplama Sonuçları</h3>
 
-          {/* Trading Results Section */}
-          <div className="space-y-4">
-            <h4 className="text-md font-medium text-gray-300">Alım-Satım İşlemleri:</h4>
+            {/* Trading Results Section */}
+            <div className="space-y-4">
+              <h4 className="text-md font-medium text-gray-300">Alım-Satım İşlemleri:</h4>
 
-            <div className="space-y-2">
-              <h5 className="text-sm font-medium text-gray-400">Sembol Bazında Kar/Zarar:</h5>
-              {Object.entries(taxResults.profit_loss_by_symbol).map(([symbol, profit]) => (
-                <div key={symbol} className="flex justify-between text-sm">
-                  <span className="text-gray-400">{symbol}:</span>
-                  <span className={`${Number(profit) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {Number(profit).toFixed(2)} TL
+              <div className="space-y-2">
+                <h5 className="text-sm font-medium text-gray-400">Sembol Bazında Kar/Zarar:</h5>
+                {Object.entries(taxResults.profit_loss_by_symbol).map(([symbol, profit]) => (
+                  <div key={symbol} className="flex justify-between text-sm">
+                    <span className="text-gray-400">{symbol}:</span>
+                    <span className={`${Number(profit) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {Number(profit).toFixed(2)} TL
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-gray-600">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Toplam Kar:</span>
+                  <span className="text-green-400">{taxResults.total_profit.toFixed(2)} TL</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Toplam Zarar:</span>
+                  <span className="text-red-400">{taxResults.total_loss.toFixed(2)} TL</span>
+                </div>
+                <div className="flex justify-between text-sm font-medium">
+                  <span className="text-gray-300">Toplam Kar/Zarar:</span>
+                  <span className={`${taxResults.total_profit_loss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {taxResults.total_profit_loss.toFixed(2)} TL
                   </span>
                 </div>
-              ))}
-            </div>
-
-            <div className="space-y-2 pt-2 border-t border-gray-600">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Toplam Kar:</span>
-                <span className="text-green-400">{taxResults.total_profit.toFixed(2)} TL</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Toplam Zarar:</span>
-                <span className="text-red-400">{taxResults.total_loss.toFixed(2)} TL</span>
-              </div>
-              <div className="flex justify-between text-sm font-medium">
-                <span className="text-gray-300">Toplam Kar/Zarar:</span>
-                <span className={`${taxResults.total_profit_loss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {taxResults.total_profit_loss.toFixed(2)} TL
-                </span>
-              </div>
-              <div className="flex justify-between text-sm font-medium pt-2 border-t border-gray-600">
-                <span className="text-gray-300">Komisyonlar Sonrası Kar/Zarar:</span>
-                <span className={`${taxResults.total_profit_loss_after_commissions >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {taxResults.total_profit_loss_after_commissions.toFixed(2)} TL
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Dividend Section */}
-          <div className="mt-8 space-y-4 pt-6 border-t border-gray-600">
-            <h4 className="text-md font-medium text-gray-300">Temettü Gelirleri:</h4>
-
-            <div className="space-y-2">
-              <h5 className="text-sm font-medium text-gray-400">Sembol Bazında Temettüler:</h5>
-              {Object.entries(taxResults.dividend_summary.dividends_by_symbol).map(([symbol, amount]) => (
-                <div key={symbol} className="flex justify-between text-sm">
-                  <span className="text-gray-400">{symbol}:</span>
-                  <span className="text-blue-400">{Number(amount).toFixed(2)} TL</span>
+                <div className="flex justify-between text-sm font-medium pt-2 border-t border-gray-600">
+                  <span className="text-gray-300">Komisyonlar Sonrası Kar/Zarar:</span>
+                  <span className={`${taxResults.total_profit_loss_after_commissions >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {taxResults.total_profit_loss_after_commissions.toFixed(2)} TL
+                  </span>
                 </div>
-              ))}
+              </div>
             </div>
 
-            <div className="space-y-2 pt-2 border-t border-gray-600">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Toplam Brüt Temettü:</span>
-                <span className="text-blue-400">{taxResults.dividend_summary.total_gross_amount.toFixed(2)} TL</span>
+            {/* Dividend Section */}
+            <div className="mt-8 space-y-4 pt-6 border-t border-gray-600">
+              <h4 className="text-md font-medium text-gray-300">Temettü Gelirleri:</h4>
+
+              <div className="space-y-2">
+                <h5 className="text-sm font-medium text-gray-400">Sembol Bazında Temettüler:</h5>
+                {Object.entries(taxResults.dividend_summary.dividends_by_symbol).map(([symbol, amount]) => (
+                  <div key={symbol} className="flex justify-between text-sm">
+                    <span className="text-gray-400">{symbol}:</span>
+                    <span className="text-blue-400">{Number(amount).toFixed(2)} TL</span>
+                  </div>
+                ))}
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Stopaj Kesintisi:</span>
-                <span className="text-red-400">{taxResults.dividend_summary.total_tax_withheld.toFixed(2)} TL</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Net Temettü:</span>
-                <span className="text-blue-400">{taxResults.dividend_summary.total_net_amount.toFixed(2)} TL</span>
+
+              <div className="space-y-2 pt-2 border-t border-gray-600">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Toplam Brüt Temettü:</span>
+                  <span className="text-blue-400">{taxResults.dividend_summary.total_gross_amount.toFixed(2)} TL</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Stopaj Kesintisi:</span>
+                  <span className="text-red-400">{taxResults.dividend_summary.total_tax_withheld.toFixed(2)} TL</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Net Temettü:</span>
+                  <span className="text-blue-400">{taxResults.dividend_summary.total_net_amount.toFixed(2)} TL</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <MissingTransactionsAlert
-        symbols={missingSymbols}
-        onContinue={() => setShowMissingAlert(false)}
-        onUpload={resetUploader}
-        open={showMissingAlert}
-        onOpenChange={setShowMissingAlert}
-      />
+        <MissingTransactionsAlert
+          symbols={missingSymbols}
+          onContinue={() => setShowMissingAlert(false)}
+          onUpload={resetUploader}
+          open={showMissingAlert}
+          onOpenChange={setShowMissingAlert}
+        />
+      </div>
     </div>
   );
-} 
+}

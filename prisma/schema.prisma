@@ -12,6 +12,7 @@ model User {
   email        String        @unique
   password     String
   name         String?
+  usage        Int           @default(3)
   transactions Transaction[]
   dividends    Dividend[]
   createdAt    DateTime      @default(now())
