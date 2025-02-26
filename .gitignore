@@ -41,6 +41,7 @@ next-env.d.ts
 
 /ekstreler
 /ekstre_test
+/Midas_Ekstre
 
 # Archived unused Python files
 /python/unused_files_*
