@@ -38,3 +38,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/ekstreler
+/ekstre_test
+
+# Archived unused Python files
+/python/unused_files_*
+/__pycache__
+/python/__pycache__
