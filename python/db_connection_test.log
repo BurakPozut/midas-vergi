@@ -1,0 +1,6 @@
+2025-03-06 15:36:29,403 - db_connection_test - INFO - Starting database connection test...
+2025-03-06 15:36:29,403 - db_connection_test - INFO - Attempting to connect to PostgreSQL at 127.0.0.1:5432/midas_tax
+2025-03-06 15:36:29,451 - db_connection_test - INFO - Successfully connected to PostgreSQL database
+2025-03-06 15:36:29,452 - db_connection_test - DEBUG - Connection test query result: (1,)
+2025-03-06 15:36:29,452 - db_connection_test - INFO - Database connection test passed
+2025-03-06 15:36:29,452 - db_connection_test - DEBUG - Connection closed

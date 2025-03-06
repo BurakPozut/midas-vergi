@@ -1,0 +1,82 @@
+2025-03-06 15:16:53,371 - extract_tables - INFO - Opening PDF with pdfplumber
+2025-03-06 15:16:53,372 - extract_tables - INFO - PDF opened successfully. Total pages: 1
+2025-03-06 15:16:53,373 - extract_tables - INFO - Processing page 1/1
+2025-03-06 15:16:53,505 - extract_tables - INFO - Found 3 tables on page 1
+2025-03-06 15:16:53,505 - extract_tables - INFO - Found investment transactions table with 5 rows
+2025-03-06 15:16:53,509 - extract_tables - INFO - Extracted 3 transaction rows and 0 dividend rows
+2025-03-06 15:16:53,510 - extract_tables - INFO - Inserting 3 transactions into database
+2025-03-06 15:16:53,510 - db_connection - INFO - Attempting to insert 3 transactions for user ad811b61-aa66-4678-bfde-679f28a9dfe7
+2025-03-06 15:16:53,511 - db_connection - INFO - Attempting to establish database connection
+2025-03-06 15:16:53,511 - db_connection - INFO - Connecting to PostgreSQL database: midas_tax on 127.0.0.1:5432 as postgres
+2025-03-06 15:16:53,688 - db_connection - INFO - Database connection established successfully
+2025-03-06 15:16:53,689 - db_connection - ERROR - Unexpected error in insert_transactions: 'psycopg2.extensions.connection' object has no attribute 'is_connected'
+2025-03-06 15:16:53,690 - db_connection - ERROR - Traceback (most recent call last):
+  File "D:\midas-vergi\python\db_connection.py", line 154, in insert_transactions
+    if not connection.is_connected():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'psycopg2.extensions.connection' object has no attribute 'is_connected'
+
+2025-03-06 15:16:53,691 - db_connection - INFO - Rolling back due to unexpected error
+2025-03-06 15:16:53,691 - extract_tables - ERROR - Failed to insert transactions into database
+2025-03-06 15:32:54,612 - extract_tables - INFO - Opening PDF with pdfplumber
+2025-03-06 15:32:54,613 - extract_tables - INFO - PDF opened successfully. Total pages: 1
+2025-03-06 15:32:54,613 - extract_tables - INFO - Processing page 1/1
+2025-03-06 15:32:54,739 - extract_tables - INFO - Found 3 tables on page 1
+2025-03-06 15:32:54,740 - extract_tables - INFO - Found investment transactions table with 5 rows
+2025-03-06 15:32:54,744 - extract_tables - INFO - Extracted 3 transaction rows and 0 dividend rows
+2025-03-06 15:32:54,744 - extract_tables - INFO - Inserting 3 transactions into database
+2025-03-06 15:32:54,744 - db_connection - INFO - Attempting to insert 3 transactions for user ad811b61-aa66-4678-bfde-679f28a9dfe7
+2025-03-06 15:32:54,745 - db_connection - INFO - Attempting to establish database connection
+2025-03-06 15:32:54,746 - db_connection - INFO - Connecting to PostgreSQL database: midas_tax on 127.0.0.1:5432 as postgres
+2025-03-06 15:32:54,798 - db_connection - INFO - Database connection established successfully
+2025-03-06 15:32:54,799 - db_connection - ERROR - Unexpected error in insert_transactions: 'psycopg2.extensions.connection' object has no attribute 'is_connected'
+2025-03-06 15:32:54,801 - db_connection - ERROR - Traceback (most recent call last):
+  File "D:\midas-vergi\python\db_connection.py", line 154, in insert_transactions
+    if not connection.is_connected():
+           ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'psycopg2.extensions.connection' object has no attribute 'is_connected'
+
+2025-03-06 15:32:54,801 - db_connection - INFO - Rolling back due to unexpected error
+2025-03-06 15:32:54,801 - extract_tables - ERROR - Failed to insert transactions into database
+2025-03-06 15:38:50,911 - extract_tables - INFO - Opening PDF with pdfplumber
+2025-03-06 15:38:50,912 - extract_tables - INFO - PDF opened successfully. Total pages: 1
+2025-03-06 15:38:50,912 - extract_tables - INFO - Processing page 1/1
+2025-03-06 15:38:51,032 - extract_tables - INFO - Found 3 tables on page 1
+2025-03-06 15:38:51,033 - extract_tables - INFO - Found investment transactions table with 5 rows
+2025-03-06 15:38:51,034 - extract_tables - INFO - Extracted 3 transaction rows and 0 dividend rows
+2025-03-06 15:38:51,036 - extract_tables - INFO - Inserting 3 transactions into database
+2025-03-06 15:38:51,036 - db_connection - INFO - Attempting to insert 3 transactions for user ad811b61-aa66-4678-bfde-679f28a9dfe7
+2025-03-06 15:38:51,036 - db_connection - INFO - Attempting to establish database connection
+2025-03-06 15:38:51,037 - db_connection - INFO - Connecting to PostgreSQL database: midas_tax on 127.0.0.1:5432 as postgres
+2025-03-06 15:38:51,088 - db_connection - INFO - Database connection established successfully
+2025-03-06 15:38:51,089 - db_connection - ERROR - Unexpected error in insert_transactions: 'prepared' is an invalid keyword argument for this function
+2025-03-06 15:38:51,090 - db_connection - ERROR - Traceback (most recent call last):
+  File "D:\midas-vergi\python\db_connection.py", line 159, in insert_transactions
+    cursor = connection.cursor(prepared=True)  # Use prepared statements for better security
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'prepared' is an invalid keyword argument for this function
+
+2025-03-06 15:38:51,090 - db_connection - INFO - Transaction rolled back due to unexpected error
+2025-03-06 15:38:51,090 - extract_tables - ERROR - Failed to insert transactions into database
+2025-03-06 15:47:07,402 - extract_tables - INFO - Opening PDF with pdfplumber
+2025-03-06 15:47:07,403 - extract_tables - INFO - PDF opened successfully. Total pages: 1
+2025-03-06 15:47:07,403 - extract_tables - INFO - Processing page 1/1
+2025-03-06 15:47:07,535 - extract_tables - INFO - Found 3 tables on page 1
+2025-03-06 15:47:07,536 - extract_tables - INFO - Found investment transactions table with 5 rows
+2025-03-06 15:47:07,540 - extract_tables - INFO - Extracted 3 transaction rows and 0 dividend rows
+2025-03-06 15:47:07,540 - extract_tables - INFO - Inserting 3 transactions into database
+2025-03-06 15:47:07,540 - db_connection - INFO - Attempting to insert 3 transactions for user ad811b61-aa66-4678-bfde-679f28a9dfe7
+2025-03-06 15:47:07,541 - db_connection - INFO - Attempting to establish database connection
+2025-03-06 15:47:07,542 - db_connection - INFO - Connecting to PostgreSQL database: midas_tax on 127.0.0.1:5432 as postgres
+2025-03-06 15:47:07,699 - db_connection - INFO - Database connection established successfully
+2025-03-06 15:47:07,701 - db_connection - ERROR - PostgreSQL Error processing row 1: relation "transaction" does not exist
+LINE 2:         INSERT INTO Transaction (
+                            ^
+
+2025-03-06 15:47:07,703 - db_connection - ERROR - PostgreSQL Error processing row 2: current transaction is aborted, commands ignored until end of transaction block
+
+2025-03-06 15:47:07,705 - db_connection - ERROR - PostgreSQL Error processing row 3: current transaction is aborted, commands ignored until end of transaction block
+
+2025-03-06 15:47:07,705 - db_connection - WARNING - Rolling back due to errors...
+2025-03-06 15:47:07,705 - db_connection - INFO - Transaction rolled back
+2025-03-06 15:47:07,705 - extract_tables - ERROR - Failed to insert transactions into database

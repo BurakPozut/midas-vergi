@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql" // Changed from "mysql" to "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id           String        @id @default(uuid()) // Auto-incrementing primary key
+  id           String        @id @default(uuid()) // UUID works in PostgreSQL
   email        String        @unique
   password     String
   name         String?
@@ -20,7 +20,7 @@ model User {
 }
 
 model Transaction {
-  id                Int      @id @default(autoincrement())
+  id                Int      @id @default(autoincrement()) // SERIAL in PostgreSQL
   date              DateTime
   transactionType   String
   symbol            String
@@ -74,79 +74,3 @@ model Dividend {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
-
-// generator client {
-//   provider = "prisma-client-js"
-// }
-
-// datasource db {
-//   provider = "mongodb"
-//   url      = env("DATABASE_URL")
-// }
-
-// model User {
-//   id           String        @id @default(auto()) @map("_id") @db.ObjectId
-//   email        String        @unique
-//   password     String
-//   name         String?
-//   transactions Transaction[]
-//   dividends    Dividend[]
-//   createdAt    DateTime      @default(now())
-//   updatedAt    DateTime      @updatedAt
-// }
-
-// model Transaction {
-//   id                String   @id @default(auto()) @map("_id") @db.ObjectId
-//   date              DateTime
-//   transactionType   String // İşlem Türü
-//   symbol            String // Sembol
-//   operationType     String // İşlem Tipi
-//   status            String // İşlem Durumu
-//   currency          String // Para Birimi
-//   orderQuantity     Float // Emir Adedi
-//   orderAmount       Float // Emir Tutarı
-//   executedQuantity  Float // Gerçekleşen Adet
-//   averagePrice      Float // Ortalama İşlem Fiyatı
-//   transactionFee    Float // İşlem Ücreti
-//   transactionAmount Float // İşlem Tutarı
-//   userId            String   @db.ObjectId
-//   user              User     @relation(fields: [userId], references: [id])
-//   createdAt         DateTime @default(now())
-//   updatedAt         DateTime @updatedAt
-// }
-
-// model Dolar {
-//   id                 String @id @default(auto()) @map("_id") @db.ObjectId
-//   gecerliOlduguTarih String @map("Gecerli Oldugu Tarih") // Format: DD.MM.YYYY
-//   dovizAlis          Float  @map("Doviz Alis")
-// }
-
-// model YiUfe {
-//   id      String @id @default(auto()) @map("_id") @db.ObjectId
-//   yil     Int    @map("YIL")
-//   ocak    Float  @map("OCAK")
-//   subat   Float  @map("ŞUBAT")
-//   mart    Float  @map("MART")
-//   nisan   Float  @map("NİSAN")
-//   mayis   Float  @map("MAYIS")
-//   haziran Float  @map("HAZİRAN")
-//   temmuz  Float  @map("TEMMUZ")
-//   agustos Float  @map("AĞUSTOS")
-//   eylul   Float  @map("EYLÜL")
-//   ekim    Float  @map("EKİM")
-//   kasim   Float  @map("KASIM")
-//   aralik  Float? @map("ARALIK") // Optional since December might not be available yet
-// }
-
-// model Dividend {
-//   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-//   paymentDate DateTime @map("Ödeme Tarihi")
-//   symbol      String   @map("Sermaya Piyasası Aracı")
-//   grossAmount Float    @map("Brüt Temettü Tutarı")
-//   taxWithheld Float    @map("Stopaj")
-//   netAmount   Float    @map("Net Temettü Tutarı")
-//   userId      String   @db.ObjectId
-//   user        User     @relation(fields: [userId], references: [id])
-//   createdAt   DateTime @default(now())
-//   updatedAt   DateTime @updatedAt
-// }
