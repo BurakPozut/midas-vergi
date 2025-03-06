@@ -1,0 +1,41 @@
+2025-03-06 16:16:23,243 - extract_tables - INFO - Opening PDF with pdfplumber
+2025-03-06 16:16:23,245 - extract_tables - INFO - PDF opened successfully. Total pages: 1
+2025-03-06 16:16:23,245 - extract_tables - INFO - Processing page 1/1
+2025-03-06 16:16:23,366 - extract_tables - INFO - Found 3 tables on page 1
+2025-03-06 16:16:23,367 - extract_tables - INFO - Found investment transactions table with 5 rows
+2025-03-06 16:16:23,370 - extract_tables - INFO - Extracted 3 transaction rows and 0 dividend rows
+2025-03-06 16:16:23,370 - extract_tables - INFO - Inserting 3 transactions into database
+2025-03-06 16:16:23,370 - extract_tables - ERROR - Database error (transactions): name 'logger' is not defined
+2025-03-06 16:16:23,372 - extract_tables - ERROR - Traceback (most recent call last):
+  File "D:\midas-vergi\python\db_connection.py", line 151, in insert_transactions
+    logger.info(f"Attempting to insert {len(transactions_df)} transactions for user {user_id}")
+    ^^^^^^
+NameError: name 'logger' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\midas-vergi\python\db_connection.py", line 229, in insert_transactions
+    logger.error(f"Unexpected error in insert_transactions: {str(e)}")
+    ^^^^^^
+NameError: name 'logger' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\midas-vergi\python\extract_tables.py", line 177, in extract_tables_and_save
+    if not insert_transactions(df, user_id):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\midas-vergi\python\db_connection.py", line 236, in insert_transactions
+    logger.debug("Closing database resources...")
+    ^^^^^^
+NameError: name 'logger' is not defined
+
+2025-03-06 16:18:51,778 - extract_tables - INFO - Opening PDF with pdfplumber
+2025-03-06 16:18:51,779 - extract_tables - INFO - PDF opened successfully. Total pages: 1
+2025-03-06 16:18:51,779 - extract_tables - INFO - Processing page 1/1
+2025-03-06 16:18:51,901 - extract_tables - INFO - Found 3 tables on page 1
+2025-03-06 16:18:51,902 - extract_tables - INFO - Found investment transactions table with 5 rows
+2025-03-06 16:18:51,905 - extract_tables - INFO - Extracted 3 transaction rows and 0 dividend rows
+2025-03-06 16:18:51,905 - extract_tables - INFO - Inserting 3 transactions into database
+2025-03-06 16:18:52,054 - extract_tables - ERROR - Failed to insert transactions into database
