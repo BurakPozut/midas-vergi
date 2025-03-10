@@ -102,6 +102,19 @@ export async function POST() {
     });
     console.log(`Found ${allTransactions.length} total transactions`);
 
+    // Add detailed logging for debugging
+    console.log("Transaction details:");
+    allTransactions.forEach((transaction, index) => {
+      console.log(`Transaction ${index + 1}:`);
+      console.log(`  Symbol: ${transaction.symbol}`);
+      console.log(`  Type: ${transaction.operationType}`);
+      console.log(`  Date: ${transaction.date}`);
+      console.log(`  Quantity: ${transaction.executedQuantity}`);
+      console.log(`  Price: ${transaction.averagePrice}`);
+      console.log(`  Amount: ${transaction.orderAmount}`);
+      console.log(`  Currency: ${transaction.currency}`);
+    });
+
     // Group transactions by symbol for easier processing
     // Each symbol will have its own array of transactions
     const transactionsBySymbol: { [key: string]: Transaction[] } = {};
@@ -111,6 +124,14 @@ export async function POST() {
       }
       transactionsBySymbol[transaction.symbol].push(transaction);
     }
+
+    // Log symbols and transaction counts
+    console.log("Transactions by symbol:");
+    Object.keys(transactionsBySymbol).forEach((symbol) => {
+      console.log(
+        `${symbol}: ${transactionsBySymbol[symbol].length} transactions`
+      );
+    });
 
     // Initialize tracking objects
     const fifoQueues: { [key: string]: FifoQueueItem[] } = {}; // FIFO queues for each symbol
@@ -141,6 +162,14 @@ export async function POST() {
         const isTaxYearTransaction =
           date >= startOfTaxYear && date <= endOfTaxYear;
 
+        console.log(
+          `Transaction date: ${date.toISOString()}, Tax year: ${taxYear}`
+        );
+        console.log(
+          `Tax year range: ${startOfTaxYear.toISOString()} to ${endOfTaxYear.toISOString()}`
+        );
+        console.log(`Is tax year transaction: ${isTaxYearTransaction}`);
+
         // Convert price to TRY if in USD
         let price = averagePrice;
         if (currency === "USD") {
@@ -160,7 +189,9 @@ export async function POST() {
             date,
           });
           console.log(
-            `Added buy: ${executedQuantity} @ ${price} TRY (${date.toISOString()})`
+            `Added buy: ${symbol} - ${executedQuantity} @ ${price.toFixed(
+              2
+            )} TRY (${date.toISOString()})`
           );
         } else if (operationType === "Satış") {
           // For sell transactions:
@@ -174,6 +205,22 @@ export async function POST() {
             }
             continue;
           }
+
+          console.log(
+            `Processing sell: ${symbol} - ${executedQuantity} @ ${price.toFixed(
+              2
+            )} TRY (${date.toISOString()})`
+          );
+          console.log(
+            `Available buy lots for ${symbol}: ${fifoQueues[symbol].length}`
+          );
+          fifoQueues[symbol].forEach((buy, index) => {
+            console.log(
+              `  Lot ${index + 1}: ${buy.quantity} @ ${buy.price.toFixed(
+                2
+              )} TRY (${buy.date.toISOString()})`
+            );
+          });
 
           // Process the sell against available buys in FIFO order
           let remainingSellQuantity = executedQuantity;
@@ -192,9 +239,21 @@ export async function POST() {
                 date.getMonth() - 1
               );
 
+              console.log(
+                `Inflation rate for ${buy.date.toISOString()} to ${date.toISOString()}: ${
+                  inflationRate || 0
+                }%`
+              );
+
               // Apply inflation adjustment if above threshold
               if (inflationRate && inflationRate > INFLATION_THRESHOLD) {
+                const oldBuyPrice = buyPrice;
                 buyPrice *= 1 + inflationRate / 100;
+                console.log(
+                  `Applied inflation adjustment: ${oldBuyPrice.toFixed(
+                    2
+                  )} -> ${buyPrice.toFixed(2)} TRY`
+                );
               }
             }
 
@@ -204,6 +263,12 @@ export async function POST() {
               if (isTaxYearTransaction) {
                 const profit = (price - buyPrice) * buy.quantity;
                 totalProfit += profit;
+                console.log(
+                  `Used entire buy lot: ${buy.quantity} @ ${buyPrice.toFixed(
+                    2
+                  )} TRY`
+                );
+                console.log(`Profit from this lot: ${profit.toFixed(2)} TRY`);
               }
               remainingSellQuantity -= buy.quantity;
               fifoQueues[symbol].shift(); // Remove the used buy lot
@@ -213,21 +278,42 @@ export async function POST() {
               if (isTaxYearTransaction) {
                 const profit = (price - buyPrice) * remainingSellQuantity;
                 totalProfit += profit;
+                console.log(
+                  `Used partial buy lot: ${remainingSellQuantity} of ${
+                    buy.quantity
+                  } @ ${buyPrice.toFixed(2)} TRY`
+                );
+                console.log(`Profit from this lot: ${profit.toFixed(2)} TRY`);
               }
               buy.quantity -= remainingSellQuantity;
               remainingSellQuantity = 0;
             }
           }
 
-          // Only update profit/loss tracking for tax year transactions
           if (isTaxYearTransaction) {
-            profitLoss[symbol] = (profitLoss[symbol] || 0) + totalProfit;
+            console.log(
+              `Total profit for this sell: ${totalProfit.toFixed(2)} TRY`
+            );
+
+            // Update profit/loss tracking
+            if (!profitLoss[symbol]) {
+              profitLoss[symbol] = 0;
+            }
+            profitLoss[symbol] += totalProfit;
+
             if (totalProfit > 0) {
               netProfit += totalProfit;
             } else {
-              netLoss += totalProfit;
+              netLoss += Math.abs(totalProfit);
             }
-            console.log(`Tax year sell: Profit/Loss = ${totalProfit} TRY`);
+
+            console.log(
+              `Updated profit/loss for ${symbol}: ${profitLoss[symbol].toFixed(
+                2
+              )} TRY`
+            );
+            console.log(`Net profit so far: ${netProfit.toFixed(2)} TRY`);
+            console.log(`Net loss so far: ${netLoss.toFixed(2)} TRY`);
           }
         }
       }
@@ -310,6 +396,43 @@ export async function POST() {
 
     // Total taxable income includes both capital gains and dividend income
     const totalTaxableIncome = finalPL + dividendSummary.total_gross_amount;
+
+    console.log("\n=== FINAL CALCULATION SUMMARY ===");
+    console.log(`Total Profit/Loss by Symbol:`);
+    Object.entries(profitLoss).forEach(([symbol, amount]) => {
+      console.log(`  ${symbol}: ${amount.toFixed(2)} TRY`);
+    });
+    console.log(`Total Net Profit: ${netProfit.toFixed(2)} TRY`);
+    console.log(`Total Net Loss: ${netLoss.toFixed(2)} TRY`);
+    console.log(`Total P/L (before commissions): ${totalPL.toFixed(2)} TRY`);
+    console.log(`Total Commissions: ${totalCommission.toFixed(2)} TRY`);
+    console.log(`Final P/L (after commissions): ${finalPL.toFixed(2)} TRY`);
+    console.log(`Dividend Summary:`);
+    console.log(
+      `  Total Gross Amount: ${dividendSummary.total_gross_amount.toFixed(
+        2
+      )} TRY`
+    );
+    console.log(
+      `  Total Tax Withheld: ${dividendSummary.total_tax_withheld.toFixed(
+        2
+      )} TRY`
+    );
+    console.log(
+      `  Total Net Amount: ${dividendSummary.total_net_amount.toFixed(2)} TRY`
+    );
+    console.log(`  Dividends by Symbol:`);
+    Object.entries(dividendSummary.dividends_by_symbol).forEach(
+      ([symbol, amount]) => {
+        console.log(`    ${symbol}: ${amount.toFixed(2)} TRY`);
+      }
+    );
+    console.log(`Total Taxable Income: ${totalTaxableIncome.toFixed(2)} TRY`);
+    if (missingBuyTransactions.length > 0) {
+      console.log(
+        `Missing Buy Transactions for: ${missingBuyTransactions.join(", ")}`
+      );
+    }
 
     // Prepare the final result object
     const result: ProfitLossResult = {
