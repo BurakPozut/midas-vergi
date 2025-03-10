@@ -10,7 +10,7 @@ This directory contains Python scripts used by the application. Below is a descr
 
 ### Database Operations
 
-- **db_connection.py** - Provides database connection and utility functions for all Python scripts.
+- **db_connection.py** - Provides database connection and utility functions for all Python scripts. Supports PostgreSQL database.
 - **insert_test_data.py** - Utility script for inserting test data into the database (development only).
 
 ### Financial Calculations
@@ -19,6 +19,18 @@ This directory contains Python scripts used by the application. Below is a descr
 - **get_commission_db.py** - Calculates commission fees based on transaction data.
 - **get_dolar.py** - Retrieves USD/TRY exchange rates from the database.
 - **inflation_calculator.py** - Calculates inflation adjustments for tax calculations.
+
+## Database Configuration
+
+The application now uses PostgreSQL as the primary database. The connection settings are configured in the `.env` file:
+
+```
+PG_HOST="127.0.0.1"
+PG_PORT="5432"
+PG_USER="postgres"
+PG_PASSWORD="your_password"
+PG_DATABASE="midas_tax"
+```
 
 ## Usage
 
@@ -33,7 +45,10 @@ To run these scripts directly for testing:
 python extract_tables.py /path/to/pdf user_id
 
 # Test database connection
-python test_db_connection.py
+python test_pg_connection.py
+
+# Install required packages
+pip install -r requirements.txt
 ```
 
 Note: Unused or deprecated scripts have been moved to an archive directory and excluded from the Git repository.

@@ -132,7 +132,7 @@ export async function POST(req: Request) {
               let error = "";
 
               const pythonProcess = spawn("python", [
-                "python/extract_tables.py",
+                "python/run_extract_tables.py",
                 absoluteFilePath,
                 userId,
               ]) as ChildProcessWithoutNullStreams;
@@ -171,9 +171,11 @@ export async function POST(req: Request) {
               pythonProcess.on("close", (code: number | null) => {
                 if (code === 0) {
                   try {
-                    const jsonResult = JSON.parse(result);
+                    // The Python script now outputs a clean JSON object
+                    const jsonResult = JSON.parse(result.trim());
                     resolve(jsonResult as PythonResult);
-                  } catch {
+                  } catch (parseError) {
+                    console.error("JSON parse error:", parseError);
                     if (error) {
                       reject(new Error(error));
                     } else {
