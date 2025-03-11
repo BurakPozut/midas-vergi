@@ -45,7 +45,7 @@ next-env.d.ts
 
 # Archived unused Python files
 /python/unused_files_*
-/__pycache__
-/python/__pycache__
+/__pycache__/
+/python/__pycache__/
 
 /logs
