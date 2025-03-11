@@ -33,7 +33,7 @@ except locale.Error:
 
 def get_db_connection():
     try:
-        # Load environment variables explicitly
+        # Load environment variables
         load_dotenv()
         
         # Get PostgreSQL environment variables
@@ -136,6 +136,7 @@ def insert_transactions(transactions_df, user_id):
         for index, row in transactions_df.iterrows():
             try:
                 transaction_date = row["Tarih"]
+                #logger.debug(f"Transaction date: {transaction_date}, type: {type(transaction_date)}")
                 
                 values = (
                     transaction_date,

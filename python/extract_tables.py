@@ -97,6 +97,8 @@ def parse_dividend_date(date_str):
 def extract_tables_and_save(pdf_path, user_id, target_title_prefix="YATIRIM İŞLEMLERİ"):
     logger.info(f"Starting extraction for PDF: {pdf_path}, User ID: {user_id}")
     try:
+        #logger.info(f"Starting extraction from PDF: {pdf_path} for user: {user_id}")
+        
         # Validate PDF exists
         if not os.path.exists(pdf_path):
             logger.error(f"PDF file not found: {pdf_path}")
