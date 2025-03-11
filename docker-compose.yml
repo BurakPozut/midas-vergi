@@ -1,0 +1,52 @@
+version: "3"
+
+services:
+  nextjs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PYTHON_API_URL=${PYTHON_API_URL}
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - python-api
+      - db
+
+  python-api:
+    build:
+      context: ./python
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+      - PG_USER=${PG_USER}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - PG_DATABASE=${PG_DATABASE}
+    volumes:
+      - ./python:/app
+      - ./uploads:/app/uploads
+      - python_temp:/app/temp_uploads
+    depends_on:
+      - db
+
+  db:
+    image: postgres:14
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${PG_USER}
+      - POSTGRES_PASSWORD=${PG_PASSWORD}
+      - POSTGRES_DB=${PG_DATABASE}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  python_temp:

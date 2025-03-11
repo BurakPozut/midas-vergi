@@ -2,8 +2,6 @@ import { writeFile, unlink } from "fs/promises";
 import { NextResponse } from "next/server";
 import { join } from "path";
 import { auth } from "@/auth";
-import { spawn } from "child_process";
-import type { ChildProcessWithoutNullStreams } from "child_process";
 import fs from "fs/promises";
 import { db } from "@/lib/prisma";
 
@@ -13,6 +11,9 @@ interface PythonResult {
   error?: string;
   hasData?: boolean;
 }
+
+// Configuration for the Python API
+const PYTHON_API_URL = process.env.PYTHON_API_URL || "http://localhost:5000";
 
 export async function POST(req: Request) {
   try {
@@ -90,7 +91,6 @@ export async function POST(req: Request) {
 
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const isLastFile = i === files.length - 1;
 
           // Send upload start event
           await writer.write(
@@ -117,103 +117,92 @@ export async function POST(req: Request) {
             continue;
           }
 
+          // Save the file to the uploads directory
           const bytes = await file.arrayBuffer();
           const buffer = Buffer.from(bytes);
-
-          // Create path and write file in user's directory
           const filePath = join("uploads", userId, file.name);
           const absoluteFilePath = join(process.cwd(), filePath);
           await writeFile(absoluteFilePath, buffer);
 
-          // Process file with Python script
-          const pythonResult = await new Promise<PythonResult>(
-            (resolve, reject) => {
-              let result = "";
-              let error = "";
-
-              const pythonProcess = spawn("python", [
-                "python/run_extract_tables.py",
-                absoluteFilePath,
-                userId,
-              ]) as ChildProcessWithoutNullStreams;
-
-              pythonProcess.stdout.setEncoding("utf-8");
-              pythonProcess.stderr.setEncoding("utf-8");
-
-              pythonProcess.stdout.on("data", async (data: string) => {
-                result += data;
-                // Send processing progress event
-                await writer.write(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "processing_progress",
-                      file: file.name,
-                      data: data.toString(),
-                    })}\n\n`
-                  )
-                );
-              });
-
-              pythonProcess.stderr.on("data", async (data: string) => {
-                error += data;
-                console.error(`Python script error: ${data}`);
-                await writer.write(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      type: "error",
-                      file: file.name,
-                      error: "İşlem sırasında hata oluştu: " + data.toString(),
-                    })}\n\n`
-                  )
-                );
-              });
-
-              pythonProcess.on("close", (code: number | null) => {
-                if (code === 0) {
-                  try {
-                    // The Python script now outputs a clean JSON object
-                    const jsonResult = JSON.parse(result.trim());
-                    resolve(jsonResult as PythonResult);
-                  } catch (parseError) {
-                    console.error("JSON parse error:", parseError);
-                    if (error) {
-                      reject(new Error(error));
-                    } else {
-                      resolve({
-                        success: true,
-                        message: "İşlem başarıyla tamamlandı",
-                        hasData: false,
-                      });
-                    }
-                  }
-                } else {
-                  reject(new Error(error || "Python script çalıştırılamadı"));
-                }
-              });
-            }
-          );
-
-          // Send completion event
-          await writer.write(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "status",
-                file: file.name,
-                status: "processing_complete",
-                result: pythonResult,
-              })}\n\n`
-            )
-          );
-
-          // Clean up the file after processing
+          // Process file with Python API
           try {
-            await unlink(absoluteFilePath);
-            if (isLastFile) {
-              await fs.rm(userUploadDir, { recursive: true });
+            // Call the Python API with the file path and user ID
+            const apiResponse = await fetch(`${PYTHON_API_URL}/process-file`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                file_path: absoluteFilePath,
+                user_id: userId,
+              }),
+            });
+
+            if (!apiResponse.ok) {
+              throw new Error(`API error: ${apiResponse.statusText}`);
             }
-          } catch (deleteError) {
-            console.error(`Error during cleanup: ${deleteError}`);
+
+            // Parse the response
+            const pythonResult: PythonResult = await apiResponse.json();
+
+            // Send processing progress event
+            await writer.write(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "processing_progress",
+                  file: file.name,
+                  data: "Processing completed",
+                })}\n\n`
+              )
+            );
+
+            // Send completion event
+            await writer.write(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "status",
+                  file: file.name,
+                  status: "processing_complete",
+                  result: pythonResult,
+                })}\n\n`
+              )
+            );
+
+            // Clean up the file after processing
+            try {
+              await unlink(absoluteFilePath);
+            } catch (deleteError) {
+              console.error(`Error deleting file: ${deleteError}`);
+            }
+          } catch (error) {
+            console.error(`Error processing file with API: ${error}`);
+            await writer.write(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  file: file.name,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : "API işleme hatası",
+                })}\n\n`
+              )
+            );
+
+            // Try to clean up the file even if processing failed
+            try {
+              await unlink(absoluteFilePath);
+            } catch (deleteError) {
+              console.error(`Error deleting file: ${deleteError}`);
+            }
           }
+        }
+
+        // Clean up the user directory after processing all files
+        try {
+          await fs.rm(userUploadDir, { recursive: true, force: true });
+        } catch (deleteError) {
+          console.error(`Error during cleanup: ${deleteError}`);
         }
 
         // Close the stream when all files are processed
