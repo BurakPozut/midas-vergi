@@ -16,6 +16,8 @@ services:
     depends_on:
       - python-api
       - db
+    env_file:
+      - .env.docker
 
   python-api:
     build:
@@ -35,6 +37,8 @@ services:
       - python_temp:/app/temp_uploads
     depends_on:
       - db
+    env_file:
+      - .env.docker
 
   db:
     image: postgres:14
@@ -46,6 +50,8 @@ services:
       - POSTGRES_DB=${PG_DATABASE}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env.docker
 
 volumes:
   postgres_data:

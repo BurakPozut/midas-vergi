@@ -104,16 +104,16 @@ export async function POST() {
 
     // Add detailed logging for debugging
     console.log("Transaction details:");
-    allTransactions.forEach((transaction, index) => {
-      console.log(`Transaction ${index + 1}:`);
-      console.log(`  Symbol: ${transaction.symbol}`);
-      console.log(`  Type: ${transaction.operationType}`);
-      console.log(`  Date: ${transaction.date}`);
-      console.log(`  Quantity: ${transaction.executedQuantity}`);
-      console.log(`  Price: ${transaction.averagePrice}`);
-      console.log(`  Amount: ${transaction.orderAmount}`);
-      console.log(`  Currency: ${transaction.currency}`);
-    });
+    // allTransactions.forEach((transaction, index) => {
+    //   console.log(`Transaction ${index + 1}:`);
+    //   console.log(`  Symbol: ${transaction.symbol}`);
+    //   console.log(`  Type: ${transaction.operationType}`);
+    //   console.log(`  Date: ${transaction.date}`);
+    //   console.log(`  Quantity: ${transaction.executedQuantity}`);
+    //   console.log(`  Price: ${transaction.averagePrice}`);
+    //   console.log(`  Amount: ${transaction.orderAmount}`);
+    //   console.log(`  Currency: ${transaction.currency}`);
+    // });
 
     // Group transactions by symbol for easier processing
     // Each symbol will have its own array of transactions
