@@ -323,7 +323,7 @@ export async function POST() {
     console.log(`\nCalculating tax year ${taxYear} commissions...`);
     let totalCommission = 0;
     const taxYearTransactions = allTransactions.filter(
-      (t) => t.date >= startOfTaxYear && t.date <= endOfTaxYear
+      (t: Transaction) => t.date >= startOfTaxYear && t.date <= endOfTaxYear
     );
 
     for (const t of taxYearTransactions) {

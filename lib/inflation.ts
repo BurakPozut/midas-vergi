@@ -44,13 +44,13 @@ export async function getInflationRate(
     let endValue: number | null = null;
 
     // Find start value
-    const startYear = rates.find((r) => r.yil === buyYear);
+    const startYear = rates.find((r: { yil: number }) => r.yil === buyYear);
     if (startYear) {
       startValue = startYear[MONTH_FIELDS[buyMonth]];
     }
 
     // Find end value
-    const endYear = rates.find((r) => r.yil === sellYear);
+    const endYear = rates.find((r: { yil: number }) => r.yil === sellYear);
     if (endYear) {
       endValue = endYear[MONTH_FIELDS[sellMonth]];
     }

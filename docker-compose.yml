@@ -9,8 +9,6 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - PYTHON_API_URL=${PYTHON_API_URL}
-      - DATABASE_URL=${DATABASE_URL}
     volumes:
       - ./uploads:/app/uploads
     depends_on:
@@ -43,7 +41,7 @@ services:
   db:
     image: postgres:14
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       - POSTGRES_USER=${PG_USER}
       - POSTGRES_PASSWORD=${PG_PASSWORD}

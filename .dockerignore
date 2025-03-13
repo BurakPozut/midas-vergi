@@ -1,7 +1,5 @@
 .env
-.env.docker
 .git
 .gitignore
 node_modules
 uploads
-prisma/migrations

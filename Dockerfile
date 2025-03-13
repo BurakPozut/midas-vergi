@@ -8,6 +8,10 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci --legacy-peer-deps
 
+# Copy Prisma schema and generate client
+COPY prisma ./prisma/
+RUN npx prisma generate
+
 # Copy the rest of the application
 COPY . .
 
@@ -18,4 +22,4 @@ RUN npm run build
 EXPOSE 3000
 
 # Command to run the application
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && npm run start"]
