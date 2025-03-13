@@ -1,4 +1,3 @@
-import mysql.connector
 import psycopg2  # Add PostgreSQL connector
 import psycopg2.extras  # Add PostgreSQL extras for DictCursor
 from datetime import datetime
